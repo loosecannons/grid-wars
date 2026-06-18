@@ -1,5 +1,20 @@
 # GRID WARS — a TRON tactics game
 
+> ## ⚠️ Disclaimer — untested, AI-generated software
+>
+> **This project was generated in its entirety by an AI and has not been
+> reviewed, tested, or verified for correctness, security, or safety.** It is an
+> experimental novelty with **no guarantee that it works** and is **not fit for
+> any purpose**. It is provided **"AS IS", without warranty of any kind**, express
+> or implied, including but not limited to the warranties of merchantability,
+> fitness for a particular purpose, and non-infringement.
+>
+> **Use entirely at your own risk.** The authors and contributors accept **no
+> liability** for any loss, damage, data loss, security incident, or other harm
+> arising from its use. Do not deploy it in production or any environment where
+> failure, downtime, or a vulnerability would matter. By using, running, building,
+> or distributing this software you accept full responsibility for doing so.
+
 A turn-based strategy game on a 3D hexagonal grid — single-player against the
 MCP or online with friends — styled after the original 1982 TRON film: dark
 world, glowing cyan and orange circuitry, bloom, light trails and derez effects.

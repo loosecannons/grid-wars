@@ -1,5 +1,19 @@
 # GRID WARS — Docker image
 
+> ## ⚠️ Disclaimer — untested, AI-generated software
+>
+> **This image and the software it contains were generated in their entirety by
+> an AI and have not been reviewed, tested, or verified for correctness,
+> security, or safety.** It is an experimental novelty with **no guarantee that
+> it works** and is **not fit for any purpose**. It is provided **"AS IS", without
+> warranty of any kind**, express or implied.
+>
+> **Use entirely at your own risk.** The authors and contributors accept **no
+> liability** for any loss, damage, data loss, security incident, or other harm
+> arising from its use. Do **not** deploy it in production or any environment
+> where failure, downtime, or a vulnerability would matter. By pulling, running,
+> or distributing this image you accept full responsibility for doing so.
+
 A turn-based **TRON-themed hex strategy game** in 3D (three.js), with
 single-player vs. the MCP and online multiplayer. This image serves the game
 **and** runs the WebSocket multiplayer relay from a single container.
