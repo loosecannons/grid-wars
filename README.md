@@ -29,8 +29,13 @@ and the Orbitron font.
 
 ### Docker
 
-A `Dockerfile` packages the server (game + multiplayer relay) into a
-runnable image:
+A prebuilt image is published on Docker Hub — pull and run it directly:
+
+```
+docker run -d -p 8123:8123 loosecannons/grid-wars:latest
+```
+
+Or build it yourself from the included `Dockerfile` (game + multiplayer relay):
 
 ```
 docker build -t gridwars .
@@ -40,7 +45,8 @@ docker run -p 8123:8123 gridwars
 
 Then open http://localhost:8123. Override the port with `-e PORT=9000`
 (and map it). The browser still loads three.js from a CDN at runtime, so
-clients need internet access.
+clients need internet access. Full image docs (tags, env vars, compose,
+multiplayer) are in [`DOCKER.md`](DOCKER.md).
 
 ## Online multiplayer
 
