@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>GRID WARS — A TRON Tactics Game</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cyan: #2bd9ff;
+    --cyan-dim: #0e6e85;
+    --orange: #ff9024;
+    --bg: #02070c;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg); overscroll-behavior: none; }
+  body { font-family: 'Orbitron', monospace; color: var(--cyan); user-select: none; -webkit-user-select: none; }
+  #app { position: fixed; inset: 0; }
+  /* the canvas owns all touch gestures (orbit / pinch) — stop the browser from
+     scrolling, zooming or pull-to-refreshing when a finger drags on the grid */
+  canvas { display: block; touch-action: none; }
+
+  .hud { position: fixed; pointer-events: none; z-index: 10; }
+
+  #topbar {
+    top: 0; left: 0; right: 0;
+    display: flex; justify-content: center; align-items: center; gap: 24px;
+    padding: 10px 16px;
+    background: linear-gradient(180deg, rgba(2,10,16,.85), transparent);
+    text-shadow: 0 0 8px var(--cyan);
+  }
+  #turn-label { font-size: 20px; font-weight: 900; letter-spacing: 4px; }
+  #turn-label.enemy { color: var(--orange); text-shadow: 0 0 8px var(--orange); }
+  #turn-count { font-size: 12px; letter-spacing: 2px; opacity: .7; }
+
+  #banner {
+    top: 32%; left: 0; right: 0; text-align: center;
+    font-size: 44px; font-weight: 900; letter-spacing: 12px;
+    text-shadow: 0 0 18px currentColor, 0 0 40px currentColor;
+    opacity: 0; transition: opacity .25s;
+  }
+  #banner.show { opacity: 1; }
+
+  #unit-card {
+    left: 16px; bottom: 16px; width: 250px;
+    border: 1px solid var(--cyan-dim);
+    background: rgba(3, 14, 20, .82);
+    box-shadow: 0 0 18px rgba(43, 217, 255, .25), inset 0 0 24px rgba(43, 217, 255, .06);
+    padding: 12px 14px; display: none;
+  }
+  #unit-card.enemy { border-color: #8a4d12; box-shadow: 0 0 18px rgba(255,144,36,.25), inset 0 0 24px rgba(255,144,36,.06); color: var(--orange); }
+  #unit-card .name { font-size: 16px; font-weight: 700; letter-spacing: 2px; margin-bottom: 6px; }
+  #unit-card .row { font-size: 11px; letter-spacing: 1px; display: flex; justify-content: space-between; padding: 2px 0; opacity: .9; }
+  #unit-card .hp-bar { height: 6px; background: #0a1a22; margin: 6px 0; border: 1px solid rgba(255,255,255,.15); }
+  #unit-card .hp-fill { height: 100%; background: currentColor; box-shadow: 0 0 8px currentColor; transition: width .3s; }
+  #unit-card .status { font-size: 10px; letter-spacing: 1px; margin-top: 6px; opacity: .7; }
+  #unit-preview {
+    height: 148px; margin: 6px 0 4px;
+    display: flex; justify-content: center;
+    border: 1px solid rgba(255,255,255,.08);
+    background: radial-gradient(ellipse at 50% 70%, rgba(20,60,80,.25), transparent);
+  }
+  #unit-preview canvas { display: block; }
+  #turret-controls, #alt-controls {
+    display: none; align-items: center; gap: 8px;
+    margin-top: 8px; pointer-events: auto;
+  }
+  #special-controls { display: flex; gap: 6px; margin-top: 8px; pointer-events: auto; }
+  #special-controls button { display: none; flex: 1; }
+  #special-controls button.armed {
+    background: rgba(255, 144, 36, .25); color: var(--orange);
+    border-color: var(--orange); text-shadow: 0 0 8px var(--orange);
+  }
+
+  /* right rail: standings on top, transmissions underneath */
+  #right-rail {
+    top: 48px; right: 16px; width: 250px;
+    display: flex; flex-direction: column; gap: 12px; align-items: stretch;
+  }
+  #scorecard {
+    border: 1px solid rgba(43, 217, 255, .25);
+    background: rgba(3, 14, 20, .78);
+    padding: 8px 10px; font-size: 10px; letter-spacing: 1px; line-height: 2;
+  }
+  #scorecard .sc-row { display: flex; gap: 8px; align-items: center; white-space: nowrap; }
+  #scorecard .sc-row.dead { opacity: .35; text-decoration: line-through; }
+  #scorecard .sc-dot { width: 9px; height: 9px; border-radius: 2px; box-shadow: 0 0 6px currentColor; background: currentColor; flex: none; }
+  #scorecard .sc-name { flex: 1; font-weight: 700; }
+  #scorecard .sc-team { opacity: .6; }
+  #scorecard .sc-cur { outline: 1px solid rgba(255,255,255,.35); outline-offset: 2px; }
+
+  #target-card {
+    right: 16px; bottom: 16px; width: 230px; display: none;
+    border: 1px solid rgba(255, 68, 51, .5);
+    background: rgba(20, 6, 4, .85);
+    box-shadow: 0 0 18px rgba(255, 68, 51, .25);
+    padding: 12px 14px;
+  }
+  #target-card .name { font-size: 13px; font-weight: 700; letter-spacing: 2px; margin-bottom: 6px; }
+  #target-preview {
+    height: 120px; margin: 4px 0 6px;
+    display: flex; justify-content: center;
+    border: 1px solid rgba(255, 68, 51, .18);
+    background: radial-gradient(ellipse at 50% 70%, rgba(80,20,10,.25), transparent);
+  }
+  #target-preview canvas { display: block; }
+  #target-card .row { font-size: 10px; letter-spacing: 1px; display: flex; justify-content: space-between; padding: 1px 0; opacity: .85; }
+  #target-card .hp-bar { position: relative; height: 8px; margin: 4px 0; background: #1a0a08; border: 1px solid rgba(255,255,255,.15); display: flex; }
+  #target-card .hp-fill { height: 100%; background: currentColor; box-shadow: 0 0 8px currentColor; }
+  #target-card .hp-loss { height: 100%; background: #ff4433; box-shadow: 0 0 10px #ff4433; animation: lossblink .5s infinite; }
+  @keyframes lossblink { 50% { opacity: .35; } }
+  #target-card .t-effect { font-size: 10px; letter-spacing: 1px; margin-top: 8px; line-height: 1.9; color: #ffb4a8; }
+  #turret-controls .tc-label, #alt-controls .tc-label { font-size: 10px; letter-spacing: 1px; opacity: .85; flex: 1; }
+  #turret-controls .tc-angle, #alt-controls .ac-state { opacity: .6; }
+  #turret-controls button, #alt-controls button { padding: 4px 10px; font-size: 13px; }
+
+  #controls { left: 50%; transform: translateX(-50%); bottom: 16px; display: flex; flex-direction: row; align-items: flex-end; gap: 8px; pointer-events: auto; }
+  button {
+    font-family: 'Orbitron', monospace; font-weight: 700; letter-spacing: 3px;
+    color: var(--cyan); background: rgba(3, 14, 20, .85);
+    border: 1px solid var(--cyan); padding: 12px 22px; font-size: 14px;
+    cursor: pointer; text-shadow: 0 0 8px var(--cyan);
+    box-shadow: 0 0 14px rgba(43, 217, 255, .35), inset 0 0 14px rgba(43,217,255,.08);
+    transition: all .15s;
+  }
+  button:hover:not(:disabled) { background: rgba(43, 217, 255, .18); box-shadow: 0 0 24px rgba(43,217,255,.6); }
+  button:disabled { opacity: .35; cursor: default; }
+  button.small { font-size: 10px; padding: 7px 12px; letter-spacing: 2px; }
+
+  /* global sound toggle — fixed top-right on every screen */
+  #btn-sound {
+    position: fixed; top: 12px; right: 12px; z-index: 62;
+    width: 34px; height: 34px; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+    pointer-events: auto;
+  }
+  #btn-sound svg { display: block; }
+  #btn-sound .snd-slash, #btn-sound .snd-cut { display: none; }
+  #btn-sound .snd-cut { stroke: #08141e; stroke-width: 4; }
+  #btn-sound.muted {
+    color: #6b7d86; border-color: #6b7d86;
+    text-shadow: none; box-shadow: none;
+  }
+  #btn-sound.muted .snd-waves { display: none; }
+  #btn-sound.muted .snd-slash, #btn-sound.muted .snd-cut { display: block; }
+  body.demo-mode #btn-sound { display: none; }
+
+  /* light / dark theme toggle — sits just left of the sound toggle (global) */
+  #btn-theme {
+    position: fixed; top: 12px; right: 54px; z-index: 62;
+    width: 34px; height: 34px; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+    pointer-events: auto;
+  }
+  #btn-theme svg { display: block; }
+  #btn-theme .thm-sun { display: none; }
+  body.light #btn-theme .thm-sun { display: block; }
+  body.light #btn-theme .thm-moon { display: none; }
+  body.demo-mode #btn-theme { display: none; }
+
+  /* instructions toggle — left of the theme toggle, in-game only */
+  #btn-help {
+    position: fixed; top: 12px; right: 96px; z-index: 62;
+    width: 34px; height: 34px; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+    pointer-events: auto;
+  }
+  #btn-help svg { display: block; }
+  #btn-help.off {
+    color: #6b7d86; border-color: #6b7d86;
+    text-shadow: none; box-shadow: none;
+  }
+  /* the instructions toggle is only meaningful in-game (the cheat-sheet it
+     controls is gameplay context) — hide it on the menus, replays and demo */
+  body:not(.in-game) #btn-help { display: none; }
+  body.demo-mode #btn-help { display: none; }
+
+  #help {
+    left: 16px; top: 56px; font-size: 10px; letter-spacing: 1px; line-height: 1.9;
+    color: rgba(43, 217, 255, .55);
+  }
+
+  #gameover {
+    position: fixed; inset: 0; z-index: 30; display: none;
+    align-items: center; justify-content: center; flex-direction: column; gap: 26px;
+    background: rgba(1, 5, 9, .82); pointer-events: auto;
+  }
+  #gameover h1 { font-size: 58px; font-weight: 900; letter-spacing: 16px; text-shadow: 0 0 24px currentColor, 0 0 70px currentColor; }
+  #gameover p { font-size: 13px; letter-spacing: 3px; opacity: .8; }
+  #gameover .go-buttons { display: flex; gap: 14px; }
+  #go-score { text-align: center; font-size: 14px; letter-spacing: 3px; line-height: 2; color: var(--cyan); }
+  #go-score .new { color: #ffd24a; text-shadow: 0 0 14px #ffd24a; font-weight: 900; letter-spacing: 5px; }
+  #go-score .hs-list { font-size: 10px; opacity: .55; letter-spacing: 2px; margin-top: 6px; }
+  #score { font-size: 13px; font-weight: 700; letter-spacing: 2px; color: #ffe9a8; text-shadow: 0 0 10px #ffd24a; }
+  #controls .ctl-row { display: flex; gap: 6px; }
+
+  #energy {
+    font-size: 15px; font-weight: 700; letter-spacing: 2px;
+    color: #aef3ff; text-shadow: 0 0 10px var(--cyan);
+  }
+
+  #build-menu {
+    left: 16px; bottom: 392px; width: 250px; display: none;
+    border: 1px solid var(--cyan-dim);
+    background: rgba(3, 14, 20, .82);
+    box-shadow: 0 0 18px rgba(43, 217, 255, .25), inset 0 0 24px rgba(43, 217, 255, .06);
+    padding: 10px 14px; pointer-events: auto;
+  }
+  #build-menu .bm-title { font-size: 11px; font-weight: 700; letter-spacing: 2px; margin-bottom: 8px; opacity: .8; }
+  #build-menu button { display: block; width: 100%; margin-bottom: 6px; text-align: left; }
+  #build-menu button:last-child { margin-bottom: 0; }
+
+  #startmenu {
+    position: fixed; inset: 0; z-index: 35; display: none;
+    align-items: center; justify-content: center; flex-direction: column; gap: 26px;
+    background: radial-gradient(ellipse at 50% 60%, rgba(8, 30, 42, .9), rgba(1, 5, 9, .96));
+  }
+  /* padding-left == letter-spacing offsets the trailing letter-spacing so the
+     centred glyphs line up with the buttons below, not the inline box */
+  #startmenu .title { font-size: 52px; font-weight: 900; letter-spacing: 16px; padding-left: 16px; text-shadow: 0 0 24px var(--cyan), 0 0 70px var(--cyan); }
+  #startmenu .sub2 { font-size: 13px; letter-spacing: 6px; padding-left: 6px; opacity: .75; }
+  #startmenu .sizes { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+  #startmenu .sizes button { display: flex; flex-direction: column; gap: 6px; align-items: center; min-width: 150px; }
+  #startmenu .sizes button span { font-size: 9px; font-weight: 500; letter-spacing: 1px; opacity: .6; }
+
+  #chat {
+    display: flex; flex-direction: column; gap: 6px; pointer-events: auto;
+  }
+  #chat-log {
+    max-height: 30vh; overflow-y: auto; display: flex; flex-direction: column;
+    gap: 3px; font-size: 10px; letter-spacing: 1px; line-height: 1.6;
+  }
+  #chat-log .msg { text-shadow: 0 0 6px currentColor; opacity: .92;
+    background: rgba(2, 10, 16, .55); padding: 2px 6px; }
+  #chat-log .msg .who { font-weight: 900; }
+  #chat-input-row { display: flex; gap: 6px; }
+  #chat-input {
+    flex: 1; font-family: 'Orbitron', monospace; font-size: 10px;
+    letter-spacing: 1px; text-transform: uppercase;
+    color: var(--cyan); background: rgba(3, 14, 20, .85);
+    border: 1px solid var(--cyan-dim); outline: none; padding: 6px 8px;
+  }
+  #btn-voice { padding: 6px 8px; }
+  #chat-head {
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 9px; letter-spacing: 2px; opacity: .8;
+  }
+  #chat-head button { padding: 2px 10px; }
+  #chat.min #chat-body { display: none; }
+  #chat-body { display: flex; flex-direction: column; gap: 6px; }
+
+  #menu-panel {
+    position: absolute; left: 0; bottom: calc(100% + 8px);
+    display: none; flex-direction: column; gap: 6px;
+    border: 1px solid var(--cyan-dim); background: rgba(3, 14, 20, .95);
+    padding: 8px;
+  }
+  #menu-panel.open { display: flex; }
+
+  #sessions-panel { display: flex; flex-direction: column; gap: 6px; max-width: 560px; }
+  #sessions-panel .sess-row { display: flex; gap: 8px; align-items: center; }
+  #sessions-panel .sess-row button.resume { flex: 1; text-align: left; font-size: 10px; padding: 8px 12px; }
+  #sessions-panel .sess-row button.del { padding: 6px 9px; }
+  #sessions-panel .sess-title { font-size: 10px; letter-spacing: 3px; opacity: .6; text-align: center; }
+
+  #hs-panel {
+    display: flex; gap: 26px; font-size: 9px; letter-spacing: 1px;
+    color: #ffe9a8; text-shadow: 0 0 8px rgba(255, 210, 74, .5); line-height: 1.9;
+  }
+  #hs-panel .hs-col { text-align: center; }
+  #hs-panel .hs-size { font-weight: 900; letter-spacing: 2px; color: var(--cyan); }
+
+  .modes { display: flex; gap: 14px; }
+  .modes button { display: flex; flex-direction: column; gap: 6px; align-items: center; min-width: 190px; }
+  .modes button span { font-size: 9px; font-weight: 500; letter-spacing: 1px; opacity: .6; }
+
+  #campaignmenu, #briefing, #replaysmenu, #rulesmenu {
+    position: fixed; inset: 0; z-index: 37; display: none;
+    align-items: center; justify-content: center; flex-direction: column; gap: 22px;
+    background: radial-gradient(ellipse at 50% 60%, rgba(8, 30, 42, .94), rgba(1, 5, 9, .97));
+  }
+  #campaignmenu .title, #briefing .title, #replaysmenu .title, #rulesmenu .title { font-size: 30px; font-weight: 900; letter-spacing: 8px; text-shadow: 0 0 18px var(--cyan); }
+
+  /* ---- custom game-rules editor ---- */
+  #rulesmenu .sub2 { font-size: 11px; letter-spacing: 4px; opacity: .7; }
+  #rules-grid { display: flex; flex-direction: column; gap: 6px; }
+  .rules-row { display: grid; grid-template-columns: 130px repeat(4, 78px); gap: 10px; align-items: center; }
+  .rules-row.rules-head span { font-size: 9px; letter-spacing: 1px; opacity: .55; text-align: center; }
+  .rules-row.rules-head span:first-child { text-align: left; }
+  .rules-unit { font-size: 11px; letter-spacing: 1px; color: var(--cyan); }
+  .rules-row input {
+    width: 100%; box-sizing: border-box; text-align: center;
+    font-family: 'Orbitron', monospace; font-size: 13px; font-weight: 700;
+    color: var(--cyan); background: rgba(3, 14, 20, .85);
+    border: 1px solid rgba(43, 217, 255, .4); padding: 6px 4px;
+  }
+  .rules-row input.changed { color: #ffe14b; border-color: #ffd24a; text-shadow: 0 0 6px rgba(255,210,74,.5); }
+  #rules-credits-row { display: flex; align-items: center; gap: 12px; font-size: 11px; letter-spacing: 2px; }
+  #rules-credits {
+    width: 110px; text-align: center; font-family: 'Orbitron', monospace; font-size: 13px;
+    font-weight: 700; color: var(--cyan); background: rgba(3, 14, 20, .85);
+    border: 1px solid rgba(43, 217, 255, .4); padding: 6px;
+  }
+  #setup-rules.custom { color: var(--yellow, #ffe14b); border-color: #ffd24a; text-shadow: 0 0 8px rgba(255,210,74,.5); }
+  #replays-list { display: flex; flex-direction: column; gap: 8px; max-height: 56vh; overflow-y: auto; min-width: 420px; }
+  #replays-list .rp-row { display: flex; align-items: center; gap: 10px; }
+  #replays-list .rp-row .play { flex: 1; text-align: left; }
+  #replays-list .rp-row .play span { font-size: 9px; opacity: .55; letter-spacing: 1px; display: block; margin-top: 3px; }
+  #replays-list .rp-empty { font-size: 11px; letter-spacing: 2px; opacity: .5; }
+  #cm-missions { display: flex; flex-direction: column; gap: 10px; }
+  #cm-missions button { min-width: 360px; text-align: left; }
+  #cm-missions button:disabled { opacity: .25; }
+  #br-lines {
+    max-width: 560px; font-size: 11px; letter-spacing: 1px; line-height: 2.1;
+    color: #b8ecf8; text-align: left;
+  }
+  #br-lines div { margin-bottom: 8px; }
+  #br-lines div::before { content: '» '; color: var(--cyan); }
+
+  #lobby {
+    position: fixed; inset: 0; z-index: 38; display: none;
+    align-items: center; justify-content: center; flex-direction: column; gap: 16px;
+    background: radial-gradient(ellipse at 50% 60%, rgba(8, 30, 42, .95), rgba(1, 5, 9, .98));
+  }
+  #lobby .title { font-size: 30px; font-weight: 900; letter-spacing: 10px; text-shadow: 0 0 18px var(--cyan); }
+  #lobby-room { font-size: 22px; font-weight: 900; letter-spacing: 8px; color: #ffe9a8; text-shadow: 0 0 14px #ffd24a; }
+  #lobby-status { font-size: 10px; letter-spacing: 3px; opacity: .7; }
+  .lobby-url { display: flex; gap: 8px; align-items: center; width: 540px; }
+  .lobby-url span { font-size: 10px; letter-spacing: 2px; width: 52px; opacity: .7; }
+  .lobby-url input {
+    flex: 1; font-family: monospace; font-size: 11px; padding: 7px 9px;
+    color: var(--cyan); background: rgba(3, 14, 20, .85);
+    border: 1px solid var(--cyan-dim); outline: none;
+  }
+  #lobby-roster { display: flex; flex-direction: column; gap: 5px; min-width: 360px; }
+  #lobby-roster .lr-row {
+    display: flex; justify-content: space-between; gap: 18px;
+    font-size: 11px; letter-spacing: 2px; padding: 5px 10px;
+    background: rgba(2, 10, 16, .6); text-shadow: 0 0 6px currentColor;
+  }
+  #lobby-roster .lr-row .st { opacity: .7; }
+
+  #setupmenu {
+    position: fixed; inset: 0; z-index: 36; display: none;
+    align-items: center; justify-content: center; flex-direction: column; gap: 20px;
+    background: radial-gradient(ellipse at 50% 60%, rgba(8, 30, 42, .92), rgba(1, 5, 9, .97));
+  }
+  #setupmenu .title { font-size: 34px; font-weight: 900; letter-spacing: 10px; text-shadow: 0 0 18px var(--cyan); }
+  #setupmenu .sub2 { font-size: 11px; letter-spacing: 4px; opacity: .7; }
+  #setup-rows { display: flex; flex-direction: column; gap: 10px; max-height: 50vh; overflow-y: auto; padding: 4px; }
+  .setup-row { display: flex; align-items: center; gap: 10px; }
+  .setup-row input {
+    font-family: 'Orbitron', monospace; font-weight: 700; letter-spacing: 2px;
+    width: 150px; padding: 8px 10px; font-size: 12px; text-transform: uppercase;
+    color: var(--cyan); background: rgba(3, 14, 20, .85);
+    border: 1px solid var(--cyan-dim); outline: none;
+  }
+  .swatches { display: flex; gap: 4px; }
+  .swatch {
+    width: 22px; height: 22px; padding: 0; border: 2px solid transparent;
+    box-shadow: none; cursor: pointer;
+  }
+  .swatch.sel { border-color: #fff; box-shadow: 0 0 10px currentColor; }
+  .setup-row .ctl { min-width: 86px; }
+  .setup-row .ctl.ai { color: var(--orange); border-color: var(--orange); text-shadow: 0 0 8px var(--orange); }
+  .setup-row .rm { padding: 6px 9px; }
+  .setup-buttons { display: flex; gap: 12px; align-items: center; }
+  .setup-mode { display: flex; gap: 10px; align-items: center; justify-content: center; font-size: 10px; letter-spacing: 2px; opacity: .85; }
+  #setup-turnmode.sim { color: var(--orange); border-color: var(--orange); text-shadow: 0 0 8px var(--orange); }
+  .setup-hint { font-size: 9px; letter-spacing: 2px; opacity: .45; text-align: center; line-height: 2; }
+
+  /* ---- menu transitions: fly through the grid ----
+     Each overlay is a 3D perspective stage; whenever it switches from
+     display:none to flex, its panels rush in from deep space and settle
+     into place, cascading one after another. Pure CSS, so every screen
+     change (forward or back) replays it with no JS coordination. */
+  #startmenu, #setupmenu, #campaignmenu, #briefing, #lobby, #replaysmenu, #rulesmenu {
+    perspective: 600px;
+    perspective-origin: 50% 45%;
+    /* backdrop stays solid & instant so the game is never revealed mid-swap;
+       only the centred content (the children) animates. */
+  }
+  /* The screen you LEAVE rushes toward the camera and dissolves (you fly
+     through its letters); the screen you ARRIVE at settles in cleanly with no
+     overshoot/bounce. The two are sequenced in JS (UI.revealScreen) so it
+     reads as "zoom through, then switch" rather than a wobble. All panels move
+     together (no stagger) so the whole block scales about one point. */
+  /* Entry/exit animations are applied via transient classes (added by
+     UI.revealScreen, removed when they finish). Gating them behind classes
+     — rather than a default `#menu > *` rule — means removing a class lands on
+     NO animation instead of re-triggering a default one (which would replay). */
+  #startmenu.fly-in > *, #setupmenu.fly-in > *, #campaignmenu.fly-in > *,
+  #briefing.fly-in > *, #lobby.fly-in > *, #replaysmenu.fly-in > *, #rulesmenu.fly-in > * {
+    animation: screen-fly-in .5s cubic-bezier(.2, .7, .3, 1) both;
+  }
+  #startmenu.exiting > *, #setupmenu.exiting > *, #campaignmenu.exiting > *,
+  #briefing.exiting > *, #lobby.exiting > *, #replaysmenu.exiting > *, #rulesmenu.exiting > * {
+    animation: screen-fly-out .42s cubic-bezier(.5, 0, .85, .35) both;
+  }
+  /* reverse direction — used for BACK / QUIT, so it feels like flying back
+     out: the screen you leave recedes into the distance, and the one you
+     return to swings in from the front (in front of the camera) and settles. */
+  #startmenu.exiting-back > *, #setupmenu.exiting-back > *,
+  #campaignmenu.exiting-back > *, #briefing.exiting-back > *,
+  #lobby.exiting-back > *, #replaysmenu.exiting-back > *, #rulesmenu.exiting-back > * {
+    animation: screen-fly-out-back .42s cubic-bezier(.4, 0, .7, .5) both;
+  }
+  #startmenu.rev-in > *, #setupmenu.rev-in > *, #campaignmenu.rev-in > *,
+  #briefing.rev-in > *, #lobby.rev-in > *, #replaysmenu.rev-in > *, #rulesmenu.rev-in > * {
+    animation: screen-fly-in-back .5s cubic-bezier(.2, .7, .3, 1) both;
+  }
+
+  @keyframes screen-fly-in {
+    /* gentle forward arrival from just behind the plane — no overshoot. */
+    0%   { opacity: 0; transform: translateZ(-260px); filter: blur(6px); }
+    100% { opacity: 1; transform: translateZ(0); filter: blur(0); }
+  }
+  @keyframes screen-fly-out {
+    /* accelerate toward the viewer, ballooning past the screen, and fade —
+       this is the "fly through the letters" moment, on the way out. */
+    0%   { opacity: 1; transform: translateZ(0) rotateX(0); filter: blur(0); }
+    100% { opacity: 0; transform: translateZ(440px) rotateX(-4deg); filter: blur(13px); }
+  }
+  @keyframes screen-fly-out-back {
+    /* recede away from the camera, shrinking into the distance, and fade. */
+    0%   { opacity: 1; transform: translateZ(0) rotateX(0); filter: blur(0); }
+    100% { opacity: 0; transform: translateZ(-560px) rotateX(5deg); filter: blur(9px); }
+  }
+  @keyframes screen-fly-in-back {
+    /* swing in from the front (big, blurred) and shrink back to readable. */
+    0%   { opacity: 0; transform: translateZ(430px); filter: blur(13px); }
+    100% { opacity: 1; transform: translateZ(0); filter: blur(0); }
+  }
+  /* QUIT TO MENU: the whole running game view (grid + HUD) recedes & fades
+     before the reload, so it reads as backing out of the grid into the menu. */
+  body.flying-out { animation: game-fly-out .4s ease-in both; transform-origin: 50% 50%; }
+  @keyframes game-fly-out {
+    to { opacity: 0; transform: scale(.8); filter: blur(7px); }
+  }
+  /* NB: deliberately NOT gated behind prefers-reduced-motion — this fly-through
+     is a requested signature effect of the title flow, so it always plays. */
+
+  #loading {
+    position: fixed; inset: 0; z-index: 40; display: flex;
+    align-items: center; justify-content: center; flex-direction: column; gap: 18px;
+    background: var(--bg); transition: opacity .6s;
+  }
+  #loading .title { font-size: 40px; font-weight: 900; letter-spacing: 14px; text-shadow: 0 0 22px var(--cyan); }
+  #loading .sub { font-size: 11px; letter-spacing: 5px; opacity: .6; animation: pulse 1.2s infinite; }
+  @keyframes pulse { 50% { opacity: .15; } }
+
+  #credit {
+    position: fixed; bottom: 8px; left: 50%; transform: translateX(-50%);
+    z-index: 41; pointer-events: none; white-space: nowrap;
+    font-size: 9px; letter-spacing: 2px; text-align: center;
+    color: rgba(43, 217, 255, .45); text-shadow: 0 0 6px rgba(43, 217, 255, .3);
+  }
+
+  #initiative-bar {
+    top: 32px; left: 0; right: 0; text-align: center;
+    font-size: 10px; letter-spacing: 2px; pointer-events: none;
+  }
+  #initiative-bar .lab { opacity: .4; margin-right: 8px; }
+  #initiative-bar .ord { opacity: .55; text-shadow: 0 0 6px currentColor; }
+  #initiative-bar .ord.cur { opacity: 1; font-weight: 900; }
+  #initiative-bar .sep { opacity: .3; margin: 0 5px; }
+
+  #visual-toggle { font-size: 10px; letter-spacing: 2px; opacity: .7; }
+  #visual-toggle.on {
+    color: #ffe9a8; border-color: #ffd24a; opacity: 1;
+    text-shadow: 0 0 8px rgba(255, 210, 74, .5);
+  }
+
+  /* ---------- replay viewer ---------- */
+  body.replay-mode .hud { display: none !important; }
+  #replay-hud { position: fixed; inset: 0; z-index: 58; display: none; pointer-events: none; }
+  #replay-watermark {
+    position: absolute; top: 16px; left: 0; right: 0; text-align: center;
+    font-size: 13px; font-weight: 900; letter-spacing: 8px;
+    color: rgba(255, 210, 74, .85); text-shadow: 0 0 12px #ffd24a;
+  }
+  #replay-bar {
+    position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 10px; width: min(820px, 92vw);
+    pointer-events: auto; background: rgba(2, 10, 16, .72);
+    border: 1px solid var(--cyan-dim); padding: 8px 12px;
+  }
+  #replay-bar button { padding: 4px 9px; font-size: 12px; }
+  #rp-speeds { display: flex; gap: 3px; }
+  #rp-speeds button.on { color: #ffe9a8; border-color: #ffd24a; text-shadow: 0 0 8px rgba(255,210,74,.5); }
+  #replay-track {
+    position: relative; flex: 1; height: 12px; cursor: pointer;
+    background: rgba(43, 217, 255, .12); border: 1px solid var(--cyan-dim);
+  }
+  #replay-fill {
+    position: absolute; left: 0; top: 0; bottom: 0; width: 0; pointer-events: none;
+    background: linear-gradient(90deg, rgba(43, 217, 255, .5), rgba(43, 217, 255, .9));
+  }
+  #replay-markers { position: absolute; inset: 0; pointer-events: none; }
+  #replay-markers .rp-mark {
+    position: absolute; top: -3px; width: 3px; height: 18px;
+    transform: translateX(-1px); box-shadow: 0 0 6px currentColor;
+  }
+  #replay-time { font-size: 10px; letter-spacing: 1px; opacity: .75; min-width: 64px; text-align: center; }
+  #replay-seeking {
+    position: fixed; inset: 0; z-index: 59; display: none;
+    align-items: center; justify-content: center;
+    background: rgba(1, 5, 9, .92);
+    font-size: 18px; font-weight: 900; letter-spacing: 8px;
+    color: var(--cyan); text-shadow: 0 0 16px var(--cyan);
+  }
+  #replay-seeking div { animation: pulse 1s infinite; }
+
+  /* ---------- demo reel (attract mode) ---------- */
+  /* a clean cinematic frame — hide all the gameplay HUD during the reel */
+  body.demo-mode .hud { display: none !important; }
+  #demo-btn {
+    display: flex; flex-direction: column; gap: 6px; align-items: center;
+    border-color: #ffd24a; color: #ffe9a8;
+    text-shadow: 0 0 10px rgba(255, 210, 74, .6);
+  }
+  #demo-btn span { font-size: 9px; font-weight: 500; letter-spacing: 1px; opacity: .7; }
+  #demo-overlay {
+    position: fixed; inset: 0; z-index: 60; display: none; cursor: pointer;
+    /* faint vignette + film bars so it reads as a reel */
+    background:
+      linear-gradient(rgba(1,5,9,.55), transparent 14%, transparent 78%, rgba(1,5,9,.65)),
+      radial-gradient(ellipse at 50% 50%, transparent 55%, rgba(1,5,9,.45));
+  }
+  #demo-watermark {
+    position: absolute; top: 16px; left: 0; right: 0; text-align: center;
+    font-size: 13px; font-weight: 900; letter-spacing: 8px;
+    color: rgba(43, 217, 255, .7); text-shadow: 0 0 12px var(--cyan);
+  }
+  #demo-exit {
+    position: absolute; bottom: 14px; right: 18px;
+    font-size: 9px; letter-spacing: 2px; color: rgba(43, 217, 255, .55);
+  }
+  #demo-title {
+    position: absolute; inset: 0; display: none;
+    flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+    text-align: center; pointer-events: none;
+  }
+  #demo-title.show { display: flex; animation: demo-pop .8s ease both; }
+  #demo-title .dt-head {
+    font-size: 64px; font-weight: 900; letter-spacing: 18px;
+    color: #eaffff; text-shadow: 0 0 26px var(--cyan), 0 0 80px var(--cyan);
+  }
+  #demo-title .dt-body {
+    font-size: 15px; letter-spacing: 5px; color: #9adfff; max-width: 70vw;
+  }
+  #demo-caption {
+    position: absolute; left: 50%; bottom: 8%; transform: translateX(-50%);
+    width: min(680px, 86vw); text-align: center; pointer-events: none;
+  }
+  #demo-caption.show { animation: demo-rise .6s cubic-bezier(.2,.7,.3,1) both; }
+  #demo-caption .dc-head {
+    font-size: 24px; font-weight: 900; letter-spacing: 6px;
+    color: #ffe9a8; text-shadow: 0 0 16px rgba(255, 210, 74, .55);
+  }
+  #demo-caption .dc-body {
+    margin-top: 8px; font-size: 13px; letter-spacing: 2px; line-height: 1.7;
+    color: #cdeffb; text-shadow: 0 0 8px rgba(43, 217, 255, .4);
+  }
+  @keyframes demo-pop { from { opacity: 0; transform: scale(.86); } to { opacity: 1; transform: scale(1); } }
+  @keyframes demo-rise { from { opacity: 0; transform: translate(-50%, 18px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+  /* ===================== small screens & touch ===================== */
+  /* Phones / narrow tablets. The desktop layout assumes a wide viewport, so
+     here we cap fixed widths to the screen, stack menus, wrap the in-game
+     control bar, fluid-scale the titles, and grow finger targets. */
+  @media (max-width: 640px) {
+    /* --- titles --- */
+    #startmenu .title { font-size: clamp(26px, 11vw, 52px); letter-spacing: 6px; padding-left: 6px; }
+    #startmenu .sub2 { font-size: 11px; letter-spacing: 3px; padding-left: 4px; }
+    #setupmenu .title, #campaignmenu .title, #briefing .title,
+    #replaysmenu .title, #rulesmenu .title, #lobby .title { font-size: clamp(22px, 8vw, 34px); letter-spacing: 5px; }
+    /* tall menus must scroll (and clear the top-right icons) — otherwise the
+       title and top rows get clipped off the top of a short screen */
+    #startmenu, #setupmenu, #campaignmenu, #briefing, #lobby, #replaysmenu, #rulesmenu {
+      gap: 14px; padding: 64px 8px 28px; justify-content: flex-start; overflow-y: auto;
+    }
+
+    /* --- menus: never wider than the screen, stack where it helps --- */
+    #startmenu .sizes { gap: 8px; width: 96vw; }
+    #startmenu .sizes button { min-width: 0; flex: 1 1 44%; }
+    .modes { flex-direction: column; width: 92vw; gap: 8px; }
+    .modes button { min-width: 0; width: 100%; }
+    #cm-missions button { min-width: 0; width: 90vw; }
+    #replays-list { min-width: 0; width: 92vw; }
+    #lobby-roster { min-width: 0; width: 88vw; }
+    #sessions-panel { max-width: 92vw; }
+
+    /* --- faction setup: rows wrap so name + colours + controls fit --- */
+    #setup-rows { width: 94vw; }
+    .setup-row { flex-wrap: wrap; gap: 6px; }
+    .setup-row input { flex: 1 1 100%; }
+    .swatches { flex-wrap: wrap; }
+    .setup-buttons { flex-wrap: wrap; justify-content: center; gap: 8px; }
+    #setup-start, #setup-lobby { flex: 1 1 100%; }
+
+    /* --- rules editor grid shrinks to fit --- */
+    #rules-grid { width: 94vw; }
+    .rules-row { grid-template-columns: 60px repeat(4, 1fr); gap: 5px; }
+    .rules-unit { font-size: 9px; }
+    .rules-row input { font-size: 12px; padding: 9px 2px; }
+    .rules-row.rules-head span { font-size: 8px; }
+
+    /* --- in-game HUD: narrower panels, smaller text --- */
+    #topbar { gap: 10px; padding: 6px 8px; }
+    #turn-label { font-size: 14px; letter-spacing: 2px; }
+    #initiative-bar { font-size: 8px; }
+    #right-rail { width: min(250px, 46vw); top: 44px; right: 8px; }
+    #unit-card, #build-menu { width: min(250px, 48vw); left: 8px; }
+    #target-card { width: min(230px, 48vw); right: 8px; }
+    #help { font-size: 8px; letter-spacing: 0; line-height: 1.7; left: 8px; top: 44px; max-width: 54vw; }
+
+    /* --- control bar: span the width and wrap; bigger finger targets --- */
+    #controls { left: 0; right: 0; transform: none; bottom: 8px; flex-wrap: wrap;
+      justify-content: center; max-width: 100vw; gap: 6px; padding: 0 6px; }
+    button.small { padding: 10px 12px; font-size: 11px; }
+    #controls button { padding: 12px 14px; }
+    #btn-endturn { padding: 12px 20px; }
+    #btn-sound, #btn-help, #btn-theme { width: 42px; height: 42px; top: 8px; }
+    #btn-sound { right: 10px; }
+    #btn-theme { right: 60px; }
+    #btn-help { right: 110px; }
+  }
+
+  /* short viewports (landscape phones, small windows): let tall menus scroll
+     from the top instead of centring and clipping off-screen */
+  @media (max-height: 560px) {
+    #startmenu, #setupmenu, #campaignmenu, #briefing, #lobby, #replaysmenu, #rulesmenu {
+      justify-content: flex-start; overflow-y: auto; padding-top: 52px; padding-bottom: 22px;
+    }
+  }
+
+  /* ===================== LIGHT THEME ============================== */
+  /* A flat grey "workstation" skin — the classic 3D-application look (think
+     LightWave on the Amiga): light-grey panels, dark text, chunky beveled
+     widgets, and the neon glows dialled out. */
+  body.light {
+    --cyan: #1b3a47;          /* ink — text & borders */
+    --cyan-dim: #79858c;
+    --bg: #b6babf;            /* desktop grey */
+    color: #1c2026; background: #b6babf;
+  }
+  /* beveled grey widgets */
+  body.light button {
+    color: #1c2026; background: #d3d6da; border: 1px solid #8b9097;
+    text-shadow: none;
+    box-shadow: inset 1.5px 1.5px 0 #f3f5f7, inset -1.5px -1.5px 0 #8a8f96;
+  }
+  body.light button:hover:not(:disabled) {
+    background: #e1e3e6;
+    box-shadow: inset 1.5px 1.5px 0 #ffffff, inset -1.5px -1.5px 0 #8a8f96;
+  }
+  body.light button:active:not(:disabled) {
+    box-shadow: inset -1.5px -1.5px 0 #f3f5f7, inset 1.5px 1.5px 0 #8a8f96; /* pressed-in */
+  }
+  body.light button:disabled { opacity: .5; }
+  body.light #btn-endturn { background: #c8dccb; }
+
+  /* menu screens: solid grey, glowless titles */
+  body.light #startmenu, body.light #setupmenu, body.light #campaignmenu,
+  body.light #briefing, body.light #lobby, body.light #replaysmenu, body.light #rulesmenu {
+    background: #b6babf;
+  }
+  body.light .title, body.light .sub, body.light .sub2,
+  body.light #turn-label, body.light #turn-count, body.light #go-title, body.light #go-sub {
+    text-shadow: none; color: #20323c;
+  }
+
+  /* HUD panels, cards, inputs — light translucent, thin border, no glow */
+  body.light #topbar {
+    background: linear-gradient(180deg, rgba(211,214,218,.96), rgba(211,214,218,.45));
+    text-shadow: none;
+  }
+  body.light #unit-card, body.light #target-card, body.light #build-menu,
+  body.light #scorecard, body.light #menu-panel, body.light #right-rail #scorecard,
+  body.light #chat-input, body.light #chat-log .msg,
+  body.light .rules-row input, body.light #rules-credits, body.light .setup-row input {
+    background: #d3d6da; color: #1c2026; border-color: #8b9097;
+    box-shadow: none; text-shadow: none;
+  }
+  body.light #help { color: #3c4750; }
+  body.light #gameover { background: rgba(182,186,191,.88); }
+  body.light .swatch.sel { border-color: #1c2026; }
+
+  /* the floating icon buttons get the same beveled grey treatment */
+  body.light #btn-sound, body.light #btn-help, body.light #btn-theme {
+    color: #1c2026; background: #d3d6da; border: 1px solid #8b9097; text-shadow: none;
+    box-shadow: inset 1.5px 1.5px 0 #f3f5f7, inset -1.5px -1.5px 0 #8a8f96;
+  }
+  body.light #btn-sound .snd-cut { stroke: #d3d6da; }  /* the mute-slash gap matches the new fill */
+</style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <button id="btn-sound" title="Toggle sound" aria-label="Toggle sound">
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+         stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <polygon points="4,9 8,9 12,5 12,19 8,15 4,15" fill="currentColor" stroke="none"></polygon>
+      <g class="snd-waves">
+        <path d="M15.5 9.5 a3.5 3.5 0 0 1 0 5"></path>
+        <path d="M17.8 7.2 a7 7 0 0 1 0 9.6"></path>
+      </g>
+      <!-- muted: a slash struck diagonally across the speaker. The backing line
+           (button-fill colour) carves a gap so the slash reads over the cone -->
+      <line class="snd-cut" x1="4" y1="5" x2="14" y2="19"></line>
+      <line class="snd-slash" x1="4" y1="5" x2="14" y2="19"></line>
+    </svg>
+  </button>
+
+  <button id="btn-theme" title="Switch to light theme" aria-label="Toggle light / dark theme">
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+         stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path class="thm-moon" d="M20 14.6 A8 8 0 1 1 9.4 4 a6.3 6.3 0 0 0 10.6 10.6 z"
+            fill="currentColor" stroke="none"></path>
+      <g class="thm-sun">
+        <circle cx="12" cy="12" r="4.1"></circle>
+        <line x1="12" y1="2.5" x2="12" y2="4.8"></line>
+        <line x1="12" y1="19.2" x2="12" y2="21.5"></line>
+        <line x1="2.5" y1="12" x2="4.8" y2="12"></line>
+        <line x1="19.2" y1="12" x2="21.5" y2="12"></line>
+        <line x1="5.2" y1="5.2" x2="6.8" y2="6.8"></line>
+        <line x1="17.2" y1="17.2" x2="18.8" y2="18.8"></line>
+        <line x1="5.2" y1="18.8" x2="6.8" y2="17.2"></line>
+        <line x1="17.2" y1="6.8" x2="18.8" y2="5.2"></line>
+      </g>
+    </svg>
+  </button>
+
+  <button id="btn-help" title="Hide instructions" aria-label="Toggle instructions">
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+         stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="9"></circle>
+      <line x1="12" y1="11" x2="12" y2="16.5"></line>
+      <circle cx="12" cy="7.7" r="1.05" fill="currentColor" stroke="none"></circle>
+    </svg>
+  </button>
+
+  <div id="topbar" class="hud">
+    <div id="turn-count">CYCLE 01</div>
+    <div id="turn-label">PROGRAM TURN</div>
+    <div id="energy" title="Energy — income each turn, spent at your core to build units">⚡ 00</div>
+    <div id="score" title="Score — derez MCP units, win fast">SCORE 0000</div>
+  </div>
+
+  <div id="initiative-bar" class="hud"></div>
+
+  <div id="right-rail" class="hud">
+    <div id="scorecard"></div>
+    <div id="chat">
+      <div id="chat-head">
+        <span>TRANSMISSIONS</span>
+        <button id="btn-chat-toggle" class="small" title="Show / hide the chat">—</button>
+      </div>
+      <div id="chat-body">
+        <div id="chat-log"></div>
+        <div id="chat-input-row">
+          <input id="chat-input" maxlength="80" placeholder="TRANSMIT..." autocomplete="off" spellcheck="false">
+          <button id="btn-voice" class="small" title="Speak chat and MCP transmissions aloud">VOICE: OFF</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="target-card" class="hud">
+    <div class="name"></div>
+    <div id="target-preview"></div>
+    <div class="hp-bar"><div class="hp-fill"></div><div class="hp-loss"></div></div>
+    <div class="row"><span>STRUCTURE</span><span class="v-hp"></span></div>
+    <div class="row"><span>RANGE</span><span class="v-range"></span></div>
+    <div class="row"><span>POWER</span><span class="v-dmg"></span></div>
+    <div class="t-effect"></div>
+  </div>
+
+  <div id="banner" class="hud"></div>
+
+  <div id="help" class="hud">
+    CLICK UNIT &mdash; SELECT<br>
+    CLICK CYAN HEX &mdash; MOVE<br>
+    CLICK RED TARGET &mdash; ATTACK<br>
+    CLICK YOUR CORE &mdash; BUILD UNITS<br>
+    REAR HITS +50% &mdash; FRONT HITS &minus;25%<br>
+    CYCLES MAY MOVE AGAIN AFTER STRIKING<br>
+    CYCLE WALLS DEREZ ENEMY CYCLES<br>
+    CYCLE SPEED CARRIES OVER TURNS<br>
+    FAST = NO TURNS &mdash; BRAKE: SHORT MOVE<br>
+    FULL-SPEED CYCLES SLIDE 2 HEXES ON<br>
+    FAST CYCLES &amp; JETS COAST ON IF UNMOVED<br>
+    TANK TURRETS &mdash; SLEW UP TO 60&deg; PER TURN<br>
+    FOCUS FIRE &mdash; REPEAT HITS +25% EACH<br>
+    PITS &amp; PLATEAUS &mdash; RECOGNIZERS ONLY<br>
+    RECOGNIZERS &mdash; ALTITUDE CONTROL<br>
+    LIGHT JETS &mdash; FAST, FRAGILE FLYERS<br>
+    JETS FIRE ONLY AT WHAT'S AHEAD<br>
+    HEAL PADS +2 &mdash; IDLE UNITS +1<br>
+    DRAG &mdash; ORBIT &nbsp;/&nbsp; WHEEL &mdash; ZOOM
+  </div>
+
+  <div id="unit-card" class="hud">
+    <div class="name"></div>
+    <div id="unit-preview"></div>
+    <div class="hp-bar"><div class="hp-fill"></div></div>
+    <div class="row"><span>STRUCTURE</span><span class="v-hp"></span></div>
+    <div class="row"><span>MOVE</span><span class="v-move"></span></div>
+    <div class="row"><span>RANGE</span><span class="v-range"></span></div>
+    <div class="row"><span>POWER</span><span class="v-dmg"></span></div>
+    <div id="turret-controls">
+      <span class="tc-label">TURRET <span class="tc-angle"></span></span>
+      <button class="small" data-turret="1" title="Rotate turret left (30°/press, up to 60° of slew per turn — keep turning over turns to aim anywhere)">&#10226;</button>
+      <button class="small" data-turret="-1" title="Rotate turret right (30°/press, up to 60° of slew per turn — keep turning over turns to aim anywhere)">&#10227;</button>
+    </div>
+    <div id="alt-controls">
+      <span class="tc-label">ALTITUDE <span class="ac-state"></span></span>
+      <button class="small" data-alt="1" title="Climb one level (max 1/turn). HIGH: +1 range, safe from cycles, +50% rocket damage. TOP: +2 range, flies over units, but +2 damage taken, no repair, drops a level when hit">&#9650;</button>
+      <button class="small" data-alt="-1" title="Descend one level (max 1/turn)">&#9660;</button>
+    </div>
+    <div id="special-controls">
+      <button class="small" id="btn-push" title="Ram an adjacent enemy cycle, shoving it one hex — into a pit, wall or the boundary if you aim well">PUSH MODE</button>
+      <button class="small" id="btn-conquer" title="Channel a conquest on the adjacent enemy core — two turns in a row converts its whole army to your colours">CONQUER 1/2</button>
+    </div>
+    <div class="status"></div>
+  </div>
+
+  <div id="build-menu" class="hud">
+    <div class="bm-title">CONSTRUCT UNIT</div>
+    <button class="small" data-build="cycle"></button>
+    <button class="small" data-build="tank"></button>
+    <button class="small" data-build="reco"></button>
+    <button class="small" data-build="jet"></button>
+  </div>
+
+  <div id="controls" class="hud">
+    <div id="menu-panel">
+      <button id="btn-invite" class="small" title="Open this game for friends to join or spectate via URL">&#128279; INVITE / SPECTATE</button>
+      <button id="btn-restart-map" class="small" title="Restart this exact map">RESTART MAP</button>
+      <button id="btn-quit" class="small" title="Back to grid selection (progress is auto-saved)">QUIT TO MENU</button>
+    </div>
+    <button id="btn-menu" class="small" title="Game menu">&#9776; MENU</button>
+    <button id="btn-undo" class="small" style="display:none" title="Undo the last unit move (Ctrl+Z) — only while no unit has fought this turn">&#8630; UNDO</button>
+    <button id="btn-next" class="small" title="Select the next unit with actions left (Tab)">NEXT UNIT &#8635;</button>
+    <button id="btn-endturn">END TURN</button>
+  </div>
+
+  <div id="gameover">
+    <h1 id="go-title"></h1>
+    <p id="go-sub"></p>
+    <div id="go-score"></div>
+    <div class="go-buttons">
+      <button id="btn-nextmission" style="display:none">NEXT MISSION</button>
+      <button id="btn-watch-replay" style="display:none">▶ WATCH REPLAY</button>
+      <button id="btn-save-replay" style="display:none">SAVE REPLAY</button>
+      <button id="btn-restart">SAME GRID</button>
+      <button id="btn-newgrid">NEW GRID</button>
+    </div>
+  </div>
+
+
+  <div id="startmenu">
+    <div class="title">GRID WARS</div>
+    <div class="modes">
+      <button data-mode="tutorial">TUTORIAL<span>BASIC TRAINING — 5 LESSONS</span></button>
+      <button data-mode="proving">PROVING GROUNDS<span>UNIT TRIALS &amp; CAPTURE-THE-CORE — 6 MAPS</span></button>
+      <button data-mode="grid_war">CAMPAIGN<span>THE GRID WAR — 5 MISSIONS</span></button>
+      <button id="demo-btn">▶ DEMO REEL<span>WATCH FEATURES &amp; STRATEGY</span></button>
+      <button id="replays-btn">REPLAYS<span>WATCH SAVED BATTLES</span></button>
+    </div>
+    <div id="sessions-panel"></div>
+    <div class="sub2">SKIRMISH — SELECT GRID SIZE</div>
+    <div class="sizes">
+      <button data-size="S">SMALL<span>91 HEXES &middot; 5 UNITS</span></button>
+      <button data-size="M">MEDIUM<span>169 HEXES &middot; 7 UNITS</span></button>
+      <button data-size="L">LARGE<span>271 HEXES &middot; 11 UNITS</span></button>
+      <button data-size="XL">EXTRA LARGE<span>469 HEXES &middot; 15 UNITS</span></button>
+      <button data-size="XXL">GIGANTIC<span>1027 HEXES &middot; 21 UNITS</span></button>
+      <button data-size="EPIC">EPIC<span>4219 HEXES &middot; 42 UNITS</span></button>
+      <button data-size="MANIC">MANIC<span>17101 HEXES &middot; 84 UNITS &middot; &#9888; HEAVY</span></button>
+    </div>
+    <button id="visual-toggle" class="small">VISUALS — MODERN</button>
+    <div id="hs-panel"></div>
+  </div>
+
+  <div id="demo-overlay">
+    <div id="demo-watermark">GRID WARS</div>
+    <div id="demo-title"><div class="dt-head"></div><div class="dt-body"></div></div>
+    <div id="demo-caption"><div class="dc-head"></div><div class="dc-body"></div></div>
+    <div id="demo-exit">ESC / CLICK TO EXIT</div>
+  </div>
+
+  <div id="replay-hud">
+    <div id="replay-watermark">▶ REPLAY</div>
+    <div id="replay-bar">
+      <button id="rp-play" class="small">❚❚</button>
+      <div id="replay-track"><div id="replay-markers"></div><div id="replay-fill"></div></div>
+      <span id="replay-time">0 / 0</span>
+      <div id="rp-speeds">
+        <button class="small on" data-spd="1">1&times;</button>
+        <button class="small" data-spd="2">2&times;</button>
+        <button class="small" data-spd="4">4&times;</button>
+      </div>
+      <button id="rp-restart" class="small" title="Restart the replay from the beginning">&#8634;</button>
+      <button id="rp-newgame" class="small" title="Play this exact map fresh as a new game">NEW GAME</button>
+      <button id="rp-exit" class="small">EXIT</button>
+    </div>
+  </div>
+  <div id="replay-seeking"><div>SEEKING&hellip;</div></div>
+
+  <div id="replaysmenu">
+    <div class="title">REPLAYS</div>
+    <div class="sub2">WATCH A SAVED BATTLE</div>
+    <div id="replays-list"></div>
+    <button id="replays-back" class="small">BACK</button>
+  </div>
+
+  <div id="campaignmenu">
+    <div class="title" id="cm-title"></div>
+    <div id="cm-missions"></div>
+    <button id="cm-back" class="small">BACK</button>
+  </div>
+
+  <div id="briefing">
+    <div class="title" id="br-title"></div>
+    <div id="br-lines"></div>
+    <div class="setup-buttons">
+      <button id="br-back" class="small">BACK</button>
+      <button id="br-launch">ENTER THE GRID</button>
+    </div>
+  </div>
+
+  <div id="lobby">
+    <div class="title">GRID LOBBY</div>
+    <div id="lobby-room"></div>
+    <div id="lobby-status"></div>
+    <div class="lobby-url">
+      <span>JOIN</span><input id="lobby-join-url" readonly>
+      <button class="small" data-copy="lobby-join-url">COPY</button>
+    </div>
+    <div class="lobby-url">
+      <span>WATCH</span><input id="lobby-watch-url" readonly>
+      <button class="small" data-copy="lobby-watch-url">COPY</button>
+    </div>
+    <div id="lobby-roster"></div>
+    <div class="setup-buttons">
+      <button id="lobby-close" class="small">LEAVE</button>
+      <button id="lobby-start">START THE GRID</button>
+    </div>
+  </div>
+
+  <div id="setupmenu">
+    <div class="title">COMBATANTS</div>
+    <div class="sub2" id="setup-sub"></div>
+    <div id="setup-rows"></div>
+    <div class="setup-mode">
+      <span>TURN MODE</span>
+      <button id="setup-turnmode" class="small" title="SEQUENTIAL: factions act one after another. SIMULTANEOUS: everyone plans, then all orders resolve at once. INITIATIVE: individual units act one at a time in initiative order across all factions.">SEQUENTIAL</button>
+    </div>
+    <div class="setup-buttons">
+      <button id="setup-add" class="small">+ ADD COMBATANT</button>
+      <button id="setup-rules" class="small" title="Customise unit stats (structure, move, damage, cost) and build credits for this game">GAME RULES</button>
+      <button id="setup-back" class="small">BACK</button>
+      <button id="setup-lobby" title="Open an online lobby — friends join the open PLAYER slots by URL">OPEN LOBBY</button>
+      <button id="setup-start">ENTER THE GRID</button>
+    </div>
+    <div class="setup-hint">NAME = LOGIN &middot; COLOUR = SIDE &middot; MCP = COMPUTER OPPONENT<br>
+      ALL COMBATANTS MAY BE MCPS — SIT BACK AND WATCH THE GRID FIGHT ITSELF</div>
+  </div>
+
+  <div id="rulesmenu">
+    <div class="title">GAME RULES</div>
+    <div class="sub2">TUNE UNIT STATS &amp; BUILD CREDITS — APPLIES TO ALL COMBATANTS</div>
+    <div id="rules-grid"></div>
+    <div id="rules-credits-row">
+      <span>BUILD CREDITS / TURN</span>
+      <input id="rules-credits" type="number" min="0" step="1" title="Energy income each turn — blank = the map's default">
+    </div>
+    <div class="setup-buttons">
+      <button id="rules-reset" class="small" title="Restore every value to stock">RESET TO DEFAULT</button>
+      <button id="rules-done">DONE</button>
+    </div>
+    <div class="setup-hint">VALUES IN YELLOW DIFFER FROM STOCK &middot; BLANK CREDITS = MAP DEFAULT</div>
+  </div>
+
+  <div id="loading">
+    <div class="title">GRID WARS</div>
+    <div class="sub">COMPILING PROGRAMS . . .</div>
+  </div>
+
+  <div id="credit">Created by Hauke von Bremen using Fable 5 and Opus 4.8</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

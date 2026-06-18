@@ -1,0 +1,10 @@
+services:
+  gridwars:
+    build: .
+    image: gridwars:latest
+    container_name: gridwars
+    ports:
+      - "8123:8123"
+    environment:
+      - PORT=8123
+    restart: unless-stopped
