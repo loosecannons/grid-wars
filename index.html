@@ -55,6 +55,27 @@
   #unit-card .hp-bar { height: 6px; background: #0a1a22; margin: 6px 0; border: 1px solid rgba(255,255,255,.15); }
   #unit-card .hp-fill { height: 100%; background: currentColor; box-shadow: 0 0 8px currentColor; transition: width .3s; }
   #unit-card .status { font-size: 10px; letter-spacing: 1px; margin-top: 6px; opacity: .7; }
+  #unit-card .name { padding-right: 24px; }  /* clear of the minimise button */
+  /* iconify: hide the unit card, leave a small button to bring it back */
+  #unit-card-min {
+    position: absolute; top: 7px; right: 8px; width: 22px; height: 22px; padding: 0;
+    display: flex; align-items: center; justify-content: center; pointer-events: auto;
+    background: rgba(43, 217, 255, .08); border: 1px solid var(--cyan-dim);
+    color: inherit; cursor: pointer; font-family: 'Orbitron', monospace;
+    font-size: 17px; line-height: 1; border-radius: 3px;
+  }
+  #unit-card-min:hover { background: rgba(43, 217, 255, .2); }
+  #unit-card.enemy #unit-card-min { border-color: #8a4d12; }
+  #unit-card-show {
+    position: fixed; left: 16px; bottom: 16px; z-index: 11; padding: 0;
+    display: none; align-items: center; justify-content: center;
+    width: 42px; height: 42px; pointer-events: auto; cursor: pointer; border-radius: 4px;
+    background: rgba(3, 14, 20, .82); border: 1px solid var(--cyan-dim); color: var(--cyan);
+    box-shadow: 0 0 14px rgba(43, 217, 255, .3);
+  }
+  #unit-card-show.show { display: flex; }
+  #unit-card-show:hover { background: rgba(43, 217, 255, .15); }
+  #unit-card-show svg { display: block; }
   #unit-preview {
     height: 148px; margin: 6px 0 4px;
     display: flex; justify-content: center;
@@ -624,6 +645,7 @@
     #initiative-bar { font-size: 8px; }
     #right-rail { width: min(250px, 46vw); top: 44px; right: 8px; }
     #unit-card, #build-menu { width: min(250px, 48vw); left: 8px; }
+    #unit-card-show { left: 8px; }
     #target-card { width: min(230px, 48vw); right: 8px; }
     #help { font-size: 8px; letter-spacing: 0; line-height: 1.7; left: 8px; top: 44px; max-width: 54vw; }
 
@@ -694,6 +716,11 @@
   body.light .rules-row input, body.light #rules-credits, body.light .setup-row input {
     background: #d3d6da; color: #1c2026; border-color: #8b9097;
     box-shadow: none; text-shadow: none;
+  }
+  body.light #unit-card-min { background: #c4c8cd; border-color: #8b9097; }
+  body.light #unit-card-show {
+    background: #d3d6da; color: #1c2026; border-color: #8b9097;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .25);
   }
   body.light #help { color: #3c4750; }
   body.light #gameover { background: rgba(182,186,191,.88); }
@@ -898,6 +925,7 @@
   </div>
 
   <div id="unit-card" class="hud">
+    <button id="unit-card-min" title="Hide the unit card (reopen it from the corner button)" aria-label="Hide unit card">&#8211;</button>
     <div class="name"></div>
     <div id="unit-preview"></div>
     <div class="hp-bar"><div class="hp-fill"></div></div>
@@ -921,6 +949,16 @@
     </div>
     <div class="status"></div>
   </div>
+
+  <button id="unit-card-show" title="Show the unit card" aria-label="Show unit card">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+         stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3.5" y="4.5" width="17" height="15" rx="2"></rect>
+      <line x1="3.5" y1="9" x2="20.5" y2="9"></line>
+      <line x1="7" y1="13" x2="13" y2="13"></line>
+      <line x1="7" y1="16" x2="11" y2="16"></line>
+    </svg>
+  </button>
 
   <div id="build-menu" class="hud">
     <div class="bm-title">CONSTRUCT UNIT</div>

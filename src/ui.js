@@ -30,6 +30,12 @@ export class UI {
     this.pushBtn.addEventListener('click', () => { if (this._onPush) this._onPush(); });
     this.conquerBtn.addEventListener('click', () => { if (this._onConquer) this._onConquer(); });
 
+    // iconify the unit card: hide it (persisted), reopen from a corner button
+    this.cardShowBtn = document.getElementById('unit-card-show');
+    this._cardMin = localStorage.getItem('gw-card-min') === '1';
+    document.getElementById('unit-card-min').addEventListener('click', () => this.setCardMin(true));
+    this.cardShowBtn.addEventListener('click', () => this.setCardMin(false));
+
     // chat & voice
     this._onChat = null;
     this.voiceOn = localStorage.getItem('gw-voice') === '1';
@@ -890,15 +896,35 @@ export class UI {
     this.targetPreview.update(dt);
   }
 
+  // Iconify / restore the unit card. The choice persists, so a player who
+  // hides it keeps it hidden across selections and sessions until they reopen.
+  setCardMin(min) {
+    this._cardMin = !!min;
+    try { localStorage.setItem('gw-card-min', this._cardMin ? '1' : '0'); } catch (e) { /* ignore */ }
+    if (this._shownUnit && this._game) this.showUnit(this._shownUnit, this._game);
+    else { this.card.style.display = 'none'; this.cardShowBtn.classList.remove('show'); }
+  }
+
   showUnit(unit, game) {
     this._shownUnit = unit || null;
+    if (game) this._game = game;
     if (!unit) {
       this._upUnit = null;
       this._upHp = null;
       this.card.style.display = 'none';
+      this.cardShowBtn.classList.remove('show');
       this.preview.hide();
       return;
     }
+    // iconified: keep the card hidden, just offer the reopen button
+    if (this._cardMin) {
+      this._upUnit = null;          // force a model rebuild when reopened
+      this.card.style.display = 'none';
+      this.preview.hide();
+      this.cardShowBtn.classList.add('show');
+      return;
+    }
+    this.cardShowBtn.classList.remove('show');
     const def = UNIT_TYPES[unit.type];
     const f = game.factionOf(unit);
     // rebuild the 3D model only when the unit or its structure changes — so
