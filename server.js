@@ -6,10 +6,26 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const { WebSocketServer } = require('ws');
 
 const PORT = process.env.PORT || 8123;
 const ROOT = __dirname;
+
+// Best guess at the machine's LAN IPv4 so invite links work from other devices
+// (phones/tablets) on the same network instead of pointing at `localhost`.
+// Prefers private LAN ranges and skips internal/loopback interfaces.
+function lanIPv4() {
+  const addrs = [];
+  for (const list of Object.values(os.networkInterfaces())) {
+    for (const i of list || []) {
+      if (i.family === 'IPv4' && !i.internal) addrs.push(i.address);
+    }
+  }
+  const priv = addrs.find((a) =>
+    /^192\.168\./.test(a) || /^10\./.test(a) || /^172\.(1[6-9]|2\d|3[01])\./.test(a));
+  return priv || addrs[0] || null;
+}
 
 const MIME = {
   '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
@@ -20,6 +36,14 @@ const MIME = {
 const server = http.createServer((req, res) => {
   let urlPath = decodeURIComponent(req.url.split('?')[0]);
   if (urlPath === '/') urlPath = '/index.html';
+  // host network info — lets the lobby build LAN-reachable invite URLs + QR
+  if (urlPath === '/__net') {
+    // PUBLIC_HOST lets Docker/hosted deployments advertise a reachable address
+    // (the container's own IP from inside isn't reachable on the LAN).
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' });
+    res.end(JSON.stringify({ ip: process.env.PUBLIC_HOST || lanIPv4(), port: Number(PORT) }));
+    return;
+  }
   const file = path.normalize(path.join(ROOT, urlPath));
   if (!file.startsWith(ROOT)) { res.writeHead(403); res.end(); return; }
   fs.readFile(file, (err, data) => {

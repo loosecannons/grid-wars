@@ -333,6 +333,16 @@
     color: var(--cyan); background: rgba(3, 14, 20, .85);
     border: 1px solid var(--cyan-dim); outline: none;
   }
+  #lobby-qr { display: none; flex-direction: column; align-items: center; gap: 7px; }
+  #lobby-qr.show { display: flex; }
+  #lobby-qr-card {
+    background: #fff; padding: 9px; border-radius: 6px; line-height: 0;
+    box-shadow: 0 0 16px rgba(43, 217, 255, .35);
+  }
+  #lobby-qr-img { width: 168px; height: 168px; display: block; image-rendering: pixelated; }
+  #lobby-qr-toggle { display: flex; gap: 6px; }
+  #lobby-qr-toggle button.on { background: var(--cyan); color: #04141d; }
+  #lobby-qr-cap { font-size: 9px; letter-spacing: 2px; opacity: .7; }
   #lobby-roster { display: flex; flex-direction: column; gap: 5px; min-width: 360px; }
   #lobby-roster .lr-row {
     display: flex; justify-content: space-between; gap: 18px;
@@ -590,6 +600,7 @@
     #cm-missions button { min-width: 0; width: 90vw; }
     #replays-list { min-width: 0; width: 92vw; }
     #lobby-roster { min-width: 0; width: 88vw; }
+    .lobby-url { width: 92vw; }
     #sessions-panel { max-width: 92vw; }
 
     /* --- faction setup: rows wrap so name + colours + controls fit --- */
@@ -1030,6 +1041,14 @@
       <span>WATCH</span><input id="lobby-watch-url" readonly>
       <button class="small" data-copy="lobby-watch-url">COPY</button>
     </div>
+    <div id="lobby-qr">
+      <div id="lobby-qr-card"><img id="lobby-qr-img" alt="Scan to join the grid"></div>
+      <div id="lobby-qr-toggle">
+        <button class="small on" data-qr="join">JOIN</button>
+        <button class="small" data-qr="watch">WATCH</button>
+      </div>
+      <div id="lobby-qr-cap">SCAN TO JOIN ON ANOTHER DEVICE</div>
+    </div>
     <div id="lobby-roster"></div>
     <div class="setup-buttons">
       <button id="lobby-close" class="small">LEAVE</button>
@@ -1093,7 +1112,8 @@
   "imports": {
     "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
     "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
-    "marked": "https://cdn.jsdelivr.net/npm/marked@12.0.2/lib/marked.esm.js"
+    "marked": "https://cdn.jsdelivr.net/npm/marked@12.0.2/lib/marked.esm.js",
+    "qrcode": "https://cdn.jsdelivr.net/npm/qrcode@1.5.4/+esm"
   }
 }
 </script>

@@ -599,6 +599,8 @@ export class UI {
       : 'GAME IN PROGRESS — SHARE TO ADD PLAYERS OR SPECTATORS';
     document.getElementById('lobby-join-url').value = opts.urls.join;
     document.getElementById('lobby-watch-url').value = opts.urls.watch;
+    // swap localhost → LAN IP and draw a scannable QR (fire-and-forget)
+    this._setupLobbyShare(opts.urls);
     for (const btn of el.querySelectorAll('button[data-copy]')) {
       btn.onclick = async () => {
         const input = document.getElementById(btn.dataset.copy);
@@ -625,6 +627,61 @@ export class UI {
 
   hideLobby() {
     document.getElementById('lobby').style.display = 'none';
+  }
+
+  // Make the invite URLs reachable from other devices and draw a QR for them.
+  // When the page is served from localhost, ask the server for its LAN IPv4 and
+  // rewrite the URLs to it (a phone can't reach the host's "localhost"); then
+  // render a scannable QR with a JOIN / WATCH toggle.
+  async _setupLobbyShare(urls) {
+    let { join, watch } = urls;
+    const host = location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '[::1]') {
+      try {
+        const net = await fetch('/__net').then((r) => r.json());
+        if (net && net.ip) {
+          join = this._swapHost(join, net.ip);
+          watch = this._swapHost(watch, net.ip);
+          document.getElementById('lobby-join-url').value = join;
+          document.getElementById('lobby-watch-url').value = watch;
+        }
+      } catch (e) { /* no LAN info — keep the localhost URLs */ }
+    }
+    this._lobbyUrls = { join, watch };
+
+    const wrap = document.getElementById('lobby-qr');
+    const cap = document.getElementById('lobby-qr-cap');
+    const buttons = wrap.querySelectorAll('#lobby-qr-toggle button');
+    const render = async (which) => {
+      for (const b of buttons) b.classList.toggle('on', b.dataset.qr === which);
+      cap.textContent = which === 'watch'
+        ? 'SCAN TO SPECTATE ON ANOTHER DEVICE' : 'SCAN TO JOIN ON ANOTHER DEVICE';
+      return this._renderQR(this._lobbyUrls[which]);
+    };
+    for (const b of buttons) b.onclick = () => render(b.dataset.qr);
+    const ok = await render('join');
+    wrap.classList.toggle('show', ok);
+  }
+
+  _swapHost(url, ip) {
+    try { const u = new URL(url); u.hostname = ip; return u.toString(); }
+    catch (e) { return url; }
+  }
+
+  async _renderQR(text) {
+    const img = document.getElementById('lobby-qr-img');
+    try {
+      const mod = await import('qrcode');
+      const QR = mod.default || mod;
+      img.src = await QR.toDataURL(text, {
+        margin: 1, width: 336, errorCorrectionLevel: 'M',
+        color: { dark: '#0a1a24', light: '#ffffff' },
+      });
+      return true;
+    } catch (e) {
+      img.removeAttribute('src');
+      return false;
+    }
   }
 
   updateLobbyRoster(rows) {
