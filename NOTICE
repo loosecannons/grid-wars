@@ -1,0 +1,26 @@
+GRID WARS
+=========
+
+NOTICE — Untested, AI-generated software
+----------------------------------------
+
+This project (all source code, 3D models, synthesized audio, and
+documentation) was generated in its entirety by an AI from natural-language
+prompts. No part of it was written or reviewed by a human engineer. See
+prompts.md for the prompt history and createPrompt.md for a single recreation
+spec.
+
+THE SOFTWARE HAS NOT BEEN REVIEWED, TESTED, OR VERIFIED for correctness,
+security, or safety. It is an experimental novelty with NO GUARANTEE THAT IT
+WORKS and is NOT FIT FOR ANY PURPOSE. It is provided "AS IS", WITHOUT WARRANTY
+OF ANY KIND, express or implied, including but not limited to the warranties of
+merchantability, fitness for a particular purpose, and non-infringement.
+
+USE ENTIRELY AT YOUR OWN RISK. The authors and contributors accept NO LIABILITY
+for any loss, damage, data loss, security incident, or other harm arising from
+its use. Do not deploy it in production or any environment where failure,
+downtime, or a vulnerability would matter. By using, running, building, or
+distributing this software you accept full responsibility for doing so.
+
+License: see the LICENSE file.
+Source:  https://github.com/loosecannons/grid-wars
