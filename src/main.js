@@ -1319,3 +1319,5 @@ ui.hideLoading();
 
 window.__game = game; // debug handle
 window.__camera = activeCamera; // debug handle (tracks modern/classic camera)
+window.__renderer = renderer; // debug handle (for on-demand frame capture)
+window.__composer = composer;  // debug handle (force a composite + read the canvas)

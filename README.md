@@ -28,6 +28,15 @@ deep-grid night look and a pale "Amiga LightWave" workstation look. The interfac
 is responsive and touch-aware, so it plays on phones and tablets as well as
 desktop.
 
+## Screenshots
+
+| | |
+|:---:|:---:|
+| ![Modern render mode — a battle on the hex grid](docs/screenshots/01-modern-battle.jpg) | ![Classic 16-bit render mode](docs/screenshots/02-classic-16bit.jpg) |
+| **Modern** — bloom + FXAA-smoothed light walls | **Classic 16-bit** — posterised palette, dark outlines, iso camera |
+| ![Light workstation theme](docs/screenshots/03-light-mode.jpg) | ![Close-up of units and light walls](docs/screenshots/04-units-walls.jpg) |
+| **Light mode** — pale "Amiga LightWave" workstation look | **Close-up** — procedural units, health bars and glowing walls |
+
 ## Run
 
 ```

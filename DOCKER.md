@@ -21,6 +21,12 @@ single-player vs. the MCP and online multiplayer. This image serves the game
 **Image:** [`loosecannons/grid-wars`](https://hub.docker.com/r/loosecannons/grid-wars)
 · **Source:** https://github.com/loosecannons/grid-wars
 
+![Modern render mode](https://raw.githubusercontent.com/loosecannons/grid-wars/main/docs/screenshots/01-modern-battle.jpg)
+
+| Classic 16-bit | Light mode |
+|:---:|:---:|
+| ![Classic 16-bit render mode](https://raw.githubusercontent.com/loosecannons/grid-wars/main/docs/screenshots/02-classic-16bit.jpg) | ![Light workstation theme](https://raw.githubusercontent.com/loosecannons/grid-wars/main/docs/screenshots/03-light-mode.jpg) |
+
 > ℹ️ The browser loads three.js and the Orbitron font from a CDN at runtime, so
 > clients need internet access. Single-player and online multiplayer both run
 > straight out of this one container.
