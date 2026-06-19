@@ -654,6 +654,43 @@ visualToggle.addEventListener('click', () => {
   applyRenderMode(); // ready for the next game (and live, if one is running)
 });
 
+// ---------- in-game MANUAL / README screen ----------
+// Reads the shipped README.md and renders it (Markdown → HTML) into a scrollable
+// overlay. `marked` is imported lazily so a CDN hiccup never blocks game boot.
+const manualOverlay = document.getElementById('manual-overlay');
+const manualContent = document.getElementById('manual-content');
+let manualLoaded = false;
+async function loadManual() {
+  if (manualLoaded) return;
+  try {
+    const [{ marked }, md] = await Promise.all([
+      import('marked'),
+      fetch('README.md').then((r) => { if (!r.ok) throw new Error(r.status); return r.text(); }),
+    ]);
+    marked.setOptions({ gfm: true, breaks: false });
+    manualContent.innerHTML = marked.parse(md);
+    // open links in a new tab so the game isn't navigated away from
+    manualContent.querySelectorAll('a[href]').forEach((a) => {
+      a.target = '_blank'; a.rel = 'noopener';
+    });
+    manualLoaded = true;
+  } catch (e) {
+    manualContent.innerHTML = '<p style="color:#ff6a5a">Could not load the manual ('
+      + e + ').<br>The README is also at '
+      + '<a href="https://github.com/loosecannons/grid-wars#readme" target="_blank" rel="noopener">github.com/loosecannons/grid-wars</a>.</p>';
+  }
+}
+function openManual() { manualOverlay.classList.add('show'); manualContent.scrollTop = 0; loadManual(); }
+function closeManual() { manualOverlay.classList.remove('show'); }
+document.getElementById('manual-btn').addEventListener('click', openManual);
+const manualGameBtn = document.getElementById('btn-manual-game');
+if (manualGameBtn) manualGameBtn.addEventListener('click', openManual);
+document.getElementById('manual-close').addEventListener('click', closeManual);
+manualOverlay.addEventListener('click', (e) => { if (e.target === manualOverlay) closeManual(); });
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && manualOverlay.classList.contains('show')) { e.preventDefault(); closeManual(); }
+});
+
 // ---------- replay viewer (watch a recorded battle) ----------
 const replay = { active: false, total: 1, angle: 0, target: new THREE.Vector3() };
 

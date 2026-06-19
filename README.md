@@ -51,26 +51,45 @@ and the Orbitron font.
 (Single-player also works from any static server — `npx http-server . -p 8123`
 — only the INVITE/join features need `server.js`.)
 
-### Docker
+### Install from Docker Hub (easiest)
 
-A prebuilt image is published on Docker Hub — pull and run it directly:
+A prebuilt image is published on Docker Hub:
+**[`loosecannons/grid-wars`](https://hub.docker.com/r/loosecannons/grid-wars)**.
+No clone, no Node, no `npm install` — just Docker:
 
+```bash
+docker run -d --name gridwars -p 8123:8123 loosecannons/grid-wars:latest
 ```
-docker run -d -p 8123:8123 loosecannons/grid-wars:latest
-```
 
-Or build it yourself from the included `Dockerfile` (game + multiplayer relay):
+Then open **http://localhost:8123**. Stop it again with `docker rm -f gridwars`.
 
-```
+- **Pin a version:** `loosecannons/grid-wars:1.0.0` (tags: `latest`, `1.0.0`).
+- **Different host port:** `-p 9000:8123` → http://localhost:9000.
+- **docker compose:**
+
+  ```yaml
+  services:
+    gridwars:
+      image: loosecannons/grid-wars:latest
+      ports: ["8123:8123"]
+      restart: unless-stopped
+  ```
+
+The container serves the game **and** the multiplayer relay. The browser loads
+three.js from a CDN at runtime, so clients need internet access. Full image docs
+(tags, env vars, multiplayer exposure, healthcheck) are in [`DOCKER.md`](DOCKER.md).
+
+### Build the image yourself
+
+From the included `Dockerfile` (game + multiplayer relay):
+
+```bash
 docker build -t gridwars .
 docker run -p 8123:8123 gridwars
 # or: docker compose up --build
 ```
 
-Then open http://localhost:8123. Override the port with `-e PORT=9000`
-(and map it). The browser still loads three.js from a CDN at runtime, so
-clients need internet access. Full image docs (tags, env vars, compose,
-multiplayer) are in [`DOCKER.md`](DOCKER.md).
+Override the in-container port with `-e PORT=9000` (and map it).
 
 ## Online multiplayer
 
@@ -442,6 +461,22 @@ fire. The MCP applies the same rules and actively flanks.
   then derezzes, core first. Allies (shared team) win together once every rival
   team's cores have fallen. Derezzed units leave glowing voxel wreckage that
   fades over three game cycles.
+
+## How this was built
+
+GRID WARS was generated **entirely by AI** from natural-language prompts — no
+hand-written code. Two artifacts document that:
+
+- **[prompts.md](prompts.md)** — the full sequential history of the ~140 prompts
+  that produced the game, in order, with the model used for each phase (initial
+  creation with **Claude Fable 5**, then expansion and polish with **Claude Opus
+  4.8**), via [Claude Code](https://claude.com/claude-code).
+- **[createPrompt.md](createPrompt.md)** — a single, structured spec-prompt that
+  folds the finished design into one document, intended to recreate the project
+  as it stands today in one shot.
+
+(See the disclaimer at the top regarding the untested, AI-generated nature of
+this software.)
 
 ## Code layout
 
