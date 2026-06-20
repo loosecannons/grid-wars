@@ -1,6 +1,6 @@
 {
   "name": "tron-grid-wars",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "private": true,
   "description": "GRID WARS - a TRON tactics game with online multiplayer",
   "author": "loosecannons <github@hvbc.de>",
