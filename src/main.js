@@ -984,6 +984,36 @@ function launchMission(cid, idx) {
   startGame(m.size, m.seed, m.factions.map((f) => ({ ...f })), m.mods || null, null, opts);
 }
 
+// Easter egg: clearing the FINAL Grid War mission "crashes" the system — a
+// Windows blue screen in dark mode, an Amiga Guru Meditation in light mode.
+// Either is dismissed with a click (the blue screen also takes any key).
+function showVictoryCrash() {
+  if (document.body.classList.contains('light')) showGuruMeditation();
+  else showBlueScreen();
+}
+function showBlueScreen() {
+  const el = document.getElementById('bsod');
+  el.classList.add('show');
+  const off = () => {
+    el.classList.remove('show');
+    el.removeEventListener('click', off);
+    window.removeEventListener('keydown', off);
+  };
+  el.addEventListener('click', off);
+  window.addEventListener('keydown', off);
+}
+function showGuruMeditation() {
+  const el = document.getElementById('guru');
+  el.classList.add('show');
+  document.body.classList.add('guru-shift'); // push the rest of the screen down
+  const off = () => {
+    el.classList.remove('show');
+    document.body.classList.remove('guru-shift');
+    el.removeEventListener('click', off);
+  };
+  el.addEventListener('click', off);
+}
+
 // winning a campaign mission unlocks the next and offers it on the game-over screen
 game.onMissionEnd = (won) => {
   if (!game.mission) return;
@@ -996,6 +1026,8 @@ game.onMissionEnd = (won) => {
   }
   const hasNext = won && CAMPAIGNS[cid].missions[idx + 1];
   document.getElementById('btn-nextmission').style.display = hasNext ? 'block' : 'none';
+  // beating the last Grid War mission triggers the retro "crash" gag
+  if (won && cid === 'grid_war' && !hasNext) setTimeout(showVictoryCrash, 2400);
 };
 
 // a same-map restart carries everything (mission or skirmish) across the reload
