@@ -2527,36 +2527,49 @@ export class Game {
     const e = hexToWorld(edgeQ, edgeR);
     const o = hexToWorld(offQ, offR);
     const cx = e.x * 0.7 + o.x * 0.3, cz = e.z * 0.7 + o.z * 0.3;
-    const center = new THREE.Vector3(cx, 0.05, cz);
+    const center = new THREE.Vector3(cx, 0.06, cz);
 
-    const positions = [];
+    // Build the cracks as thin RIBBONS (flat quads) rather than 1px lines, which
+    // vanish at gameplay zoom. Each segment tapers from a wider root to a hair
+    // tip, like a real fracture. A muted ice-grey reads against the dark floor
+    // without glowing.
+    const verts = [];
+    const HALF = 0.05; // half-width of the crack root
     const branches = 4 + Math.floor(this.rand() * 3);
     for (let b = 0; b < branches; b++) {
       let ang = (b / branches) * Math.PI * 2 + (this.rand() - 0.5) * 0.7;
-      let px = 0, pz = 0;
+      let px = 0, pz = 0, pw = HALF;
       const segs = 2 + Math.floor(this.rand() * 3);
       for (let s = 0; s < segs; s++) {
         ang += (this.rand() - 0.5) * 0.9;                 // wander like a real crack
-        const len = 0.12 + this.rand() * 0.22;
+        const len = 0.16 + this.rand() * 0.3;
         const nx = px + Math.cos(ang) * len, nz = pz + Math.sin(ang) * len;
-        positions.push(px, 0, pz, nx, 0, nz);
-        px = nx; pz = nz;
+        const nw = pw * 0.6;                              // taper toward the tip
+        const perpX = -Math.sin(ang), perpZ = Math.cos(ang);
+        const aL = [px + perpX * pw, 0, pz + perpZ * pw];
+        const aR = [px - perpX * pw, 0, pz - perpZ * pw];
+        const bL = [nx + perpX * nw, 0, nz + perpZ * nw];
+        const bR = [nx - perpX * nw, 0, nz - perpZ * nw];
+        verts.push(...aL, ...aR, ...bL, ...aR, ...bR, ...bL); // two triangles
+        px = nx; pz = nz; pw = nw;
       }
     }
     const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    // a thin, cool-grey hairline at low opacity — reads as a crack catching the
-    // faint ambient light, not a glow (no additive blending)
-    const mat = new THREE.LineBasicMaterial({ color: 0x223240, transparent: true, opacity: 0.5 });
-    const crack = new THREE.LineSegments(geo, mat);
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0x8aa6b8, transparent: true, opacity: 0.7,
+      depthWrite: false, side: THREE.DoubleSide,
+    });
+    const crack = new THREE.Mesh(geo, mat);
     crack.position.copy(center);
+    crack.renderOrder = 2; // draw over the floor tiles
     this.scene.add(crack);
     this.portals.push({ q: offQ, r: offR, edgeQ, edgeR, mesh: crack, center });
 
     // the impact is quiet: a little grit kicked up, a soft knock — nothing flashy
-    this.fx.burst({ pos: center.clone().setY(0.08), count: 7, color: 0x3a4650,
-      speed: 1.1, life: 0.5, size: 0.05, gravity: 3, spread: 0.5 });
-    this.fx.shake(0.07);
+    this.fx.burst({ pos: center.clone().setY(0.08), count: 9, color: 0x6f8593,
+      speed: 1.3, life: 0.6, size: 0.05, gravity: 3, spread: 0.5 });
+    this.fx.shake(0.08);
     this.audio.blip();
   }
 
