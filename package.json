@@ -8,7 +8,8 @@
   "scripts": {
     "start": "node server.js",
     "electron": "electron .",
-    "dist:win": "electron-builder --win portable --x64 --publish never"
+    "dist:win": "electron-builder --win portable --x64 --publish never",
+    "dist:linux": "electron-builder --linux AppImage --x64 --publish never"
   },
   "dependencies": {
     "ws": "^8.18.0"
@@ -32,6 +33,11 @@
     },
     "portable": {
       "artifactName": "GRID-WARS-${version}-portable.exe"
+    },
+    "linux": {
+      "target": "AppImage",
+      "category": "Game",
+      "artifactName": "GRID-WARS-${version}-x86_64.AppImage"
     }
   }
 }

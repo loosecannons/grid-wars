@@ -1,0 +1,45 @@
+# Build the GRID WARS Linux desktop app (Electron AppImage) and attach it to the
+# GitHub release. A manual run uploads it as a downloadable artifact. Mirrors the
+# Windows build; AppImage builds natively on Linux (no Wine).
+name: Build Linux AppImage
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install build tools (electron + builder, plus app deps)
+        run: npm install --no-save electron@^31.0.0 electron-builder@^24.13.3
+
+      - name: Build AppImage
+        run: npm run dist:linux
+
+      - name: List output
+        run: ls -lh dist-exe
+
+      - name: Attach AppImage to the release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist-exe/*.AppImage
+
+      - name: Upload AppImage as an artifact (manual runs)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: gridwars-linux-appimage
+          path: dist-exe/*.AppImage

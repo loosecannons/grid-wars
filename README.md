@@ -91,18 +91,23 @@ docker run -p 8123:8123 gridwars
 
 Override the in-container port with `-e PORT=9000` (and map it).
 
-### Windows desktop app (.exe)
+### Desktop app (Windows & Linux)
 
-A portable Windows build is attached to each [GitHub release](https://github.com/loosecannons/grid-wars/releases)
-(`GRID-WARS-<version>-portable.exe`). Download and double-click it — no install.
-It's an [Electron](https://www.electronjs.org/) wrapper that runs the bundled
+Portable desktop builds are attached to each [GitHub release](https://github.com/loosecannons/grid-wars/releases):
+
+- **Windows** — `GRID-WARS-<version>-portable.exe`. Download and double-click; no install.
+- **Linux** — `GRID-WARS-<version>-x86_64.AppImage`. `chmod +x` it and run; no install.
+
+Each is an [Electron](https://www.electronjs.org/) wrapper that runs the bundled
 game **and** the multiplayer relay in a native window, so single-player and
 hosting/joining online games both work. (three.js and the Orbitron font still
 load from a CDN, so it needs an internet connection.)
 
-Build it yourself: `npm install electron electron-builder && npm run dist:win`
-(output in `dist-exe/`). The build is produced in CI by
-[`.github/workflows/build-windows.yml`](.github/workflows/build-windows.yml).
+Build them yourself: `npm install electron electron-builder`, then
+`npm run dist:win` or `npm run dist:linux` (output in `dist-exe/`). The builds
+are produced in CI by
+[`build-windows.yml`](.github/workflows/build-windows.yml) and
+[`build-linux.yml`](.github/workflows/build-linux.yml).
 
 ## Online multiplayer
 
