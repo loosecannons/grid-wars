@@ -903,7 +903,7 @@ let mapEditor = null;
 function openEditor(loadMap) {
   if (!mapEditor) {
     mapEditor = new MapEditor(document.getElementById('editor-body'), {
-      onPlay: (map) => playCustomMap(map),
+      onPlay: (map) => playCustomMap(map, true), // test-drive: offer "return to editor"
       onSave: (map) => saveMapToServer(map),
       onClose: () => { ui._navBack = true; ui.showStartMenu(); },
     });
@@ -922,7 +922,7 @@ async function saveMapToServer(map) {
 }
 // Boot a game from a custom map: its faction setup becomes the combatants and
 // its terrain + placements override the procedural generation.
-function playCustomMap(map) {
+function playCustomMap(map, fromEditor) {
   const configs = (map.factions || []).map((f, i) => ({
     name: f.name || ('PROGRAM ' + (i + 1)),
     color: f.color || 0,
@@ -932,10 +932,17 @@ function playCustomMap(map) {
   if (configs.length < 2 || !SIZES[map.sizeKey]) return;
   game.mission = null;
   game.sessionId = null; // a custom-map game is its own session
+  // a test-drive from the editor stashes its map so MENU → EDITOR can return to it
+  try {
+    if (fromEditor) sessionStorage.setItem('gw-editor-map', JSON.stringify(map));
+    else sessionStorage.removeItem('gw-editor-map');
+  } catch (e) { /* ignore */ }
   const seed = Math.floor(Math.random() * 1e9);
   const mode = localStorage.getItem('gw-turnmode') || 'seq';
   startGame(map.sizeKey, seed, configs, null, null,
     { customMap: map, simultaneous: mode === 'sim', perUnitInit: mode === 'init' });
+  const back = document.getElementById('btn-toeditor');
+  if (back) back.style.display = fromEditor ? 'block' : 'none';
 }
 
 function showMapsMenu() {
@@ -991,6 +998,16 @@ document.getElementById('editor-btn').addEventListener('click', () => openEditor
 document.getElementById('maps-btn').addEventListener('click', showMapsMenu);
 document.getElementById('maps-back').addEventListener('click', () => { ui._navBack = true; ui.showStartMenu(); });
 document.getElementById('btn-savemap').addEventListener('click', saveCurrentMap);
+// return to the editor from a test-drive: reload (the app leaves games by
+// reloading) and reopen the editor with the stashed map
+document.getElementById('btn-toeditor').addEventListener('click', () => {
+  try {
+    sessionStorage.setItem('gw-reopen-editor', '1');
+    sessionStorage.setItem('gw-nav-back', '1');
+  } catch (e) { /* ignore */ }
+  document.body.classList.add('flying-out');
+  setTimeout(() => location.reload(), 400);
+});
 
 // ---------- sessions: several games may be open at once ----------
 
@@ -1273,6 +1290,15 @@ if (joinRoom || watchRoom) {
   } catch (e) {
     newGameFlow();
   }
+} else if (sessionStorage.getItem('gw-reopen-editor')) {
+  // returning from a test-drive — set up the start menu (so the editor's CLOSE
+  // has somewhere to go), then reopen the editor with the stashed map
+  sessionStorage.removeItem('gw-reopen-editor');
+  newGameFlow();
+  try {
+    const map = JSON.parse(sessionStorage.getItem('gw-editor-map') || 'null');
+    openEditor(map || undefined);
+  } catch (e) { /* the start menu is already shown */ }
 } else {
   newGameFlow();
 }

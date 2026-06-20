@@ -178,7 +178,8 @@ Build your own grids and play them. From the start screen:
   units for each faction. The **FACTION** strip selects which side you're placing
   for (click a swatch to select, double-click to recolour); **+ / −** add or
   remove factions and the **HUMAN / MCP** button sets a faction's controller.
-  **▶ PLAY** test-drives the map immediately; **SAVE** stores it on the server.
+  **▶ PLAY** test-drives the map immediately (the in-game **☰ MENU → ↩ EDITOR**
+  jumps straight back to keep tweaking); **SAVE** stores it on the server.
 - **CUSTOM MAPS** lists every saved grid — **play**, **EDIT**, or delete it.
 - Each faction that has any units needs a **core**, and a map needs at least two
   cored factions before it can be played or saved.
