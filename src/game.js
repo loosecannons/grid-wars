@@ -2547,28 +2547,33 @@ export class Game {
       B.z + tan.z * u + out.z * d);
 
     const pos = [], col = [];
-    const DEPTH = 0.13;
-    // rim sits just under the bloom threshold (~0.25 luma) so it reads as a lit,
-    // crisp fracture edge — NOT a glow; the void is near-black depth
-    const RIM = [0.18, 0.22, 0.26], VOID = [0.01, 0.02, 0.035];
+    const DEPTH = 0.09, LIP = 0.035; // recess depth, and the thin lit edge width
+    // a bright crisp fracture edge (just under the ~0.25 bloom threshold, so no
+    // glow) framing a flat, near-black void you see into. The transition is a
+    // short vertical lip, not a smooth gradient — so the edges read HARD.
+    const RIM = [0.20, 0.24, 0.28], VOID = [0.008, 0.016, 0.03];
     const v = (p, c) => { pos.push(p.x, p.y, p.z); col.push(c[0], c[1], c[2]); };
     const tri = (a, ca, b, cb, c, cc) => { v(a, ca); v(b, cb); v(c, cc); };
     const branches = 5 + Math.floor(this.rand() * 4); // radial cracks, like a struck pane
     for (let b = 0; b < branches; b++) {
       let ang = (b / branches) * Math.PI * 2 + (this.rand() - 0.5) * 0.5;
-      let pu = 0, pv = 0, pw = 0.05;
+      let pu = 0, pv = 0, pw = 0.13;                     // WIDER root
       const segs = 2 + Math.floor(this.rand() * 3);
       for (let s = 0; s < segs; s++) {
         ang += (this.rand() - 0.5) * 1.0;                 // sharp, angular turns
-        const len = 0.16 + this.rand() * 0.3;
+        const len = 0.18 + this.rand() * 0.34;
         const nu = pu + Math.cos(ang) * len, nv = pv + Math.sin(ang) * len;
-        const nw = pw * 0.55;
+        const nw = pw * 0.72;                             // gentler taper → stays wide
         const ex = -Math.sin(ang), ey = Math.cos(ang);    // perpendicular in the wall plane
+        const wcA = Math.max(0.006, pw - LIP), wcB = Math.max(0.006, nw - LIP);
+        // outer rim (lit, on the wall surface) and inner edge (dark, recessed)
         const TLa = W(pu + ex * pw, pv + ey * pw, 0), TLb = W(nu + ex * nw, nv + ey * nw, 0);
         const TRa = W(pu - ex * pw, pv - ey * pw, 0), TRb = W(nu - ex * nw, nv - ey * nw, 0);
-        const BOa = W(pu, pv, DEPTH), BOb = W(nu, nv, DEPTH);
-        tri(TLa, RIM, TLb, RIM, BOb, VOID); tri(TLa, RIM, BOb, VOID, BOa, VOID);
-        tri(TRa, RIM, BOa, VOID, BOb, VOID); tri(TRa, RIM, BOb, VOID, TRb, RIM);
+        const ILa = W(pu + ex * wcA, pv + ey * wcA, DEPTH), ILb = W(nu + ex * wcB, nv + ey * wcB, DEPTH);
+        const IRa = W(pu - ex * wcA, pv - ey * wcA, DEPTH), IRb = W(nu - ex * wcB, nv - ey * wcB, DEPTH);
+        tri(TLa, RIM, TLb, RIM, ILb, VOID); tri(TLa, RIM, ILb, VOID, ILa, VOID);   // left lit edge → recess
+        tri(ILa, VOID, ILb, VOID, IRb, VOID); tri(ILa, VOID, IRb, VOID, IRa, VOID); // flat dark void floor
+        tri(TRa, RIM, IRa, VOID, IRb, VOID); tri(TRa, RIM, IRb, VOID, TRb, RIM);   // right lit edge → recess
         pu = nu; pv = nv; pw = nw;
       }
     }
