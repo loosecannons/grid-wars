@@ -2514,41 +2514,50 @@ export class Game {
   async _hitBoundary(unit, off, edge) {
     const existing = off && this._portalAt(off.q, off.r);
     if (existing) { await this._enterPortal(unit, existing); return; }
-    const pos = unit.mesh.position.clone(); pos.y += 1.3;
-    this.fx.floatText(pos, 'WALL CRACKED', '#9fe9ff');
     if (off) this._createPortal(off.q, off.r, edge ? edge.q : unit.q, edge ? edge.r : unit.r);
-    else this.fx.ring(unit.mesh.position.clone(), 0xffffff, 2.0, 0.4);
     await this.applyDamage(unit, unit.hp);
   }
 
+  // A portal isn't a glowing ring — it's a barely-there fracture in the floor,
+  // a few jagged hairline cracks radiating from where the cycle struck the
+  // boundary. Easy to miss unless you're looking.
   _createPortal(offQ, offR, edgeQ, edgeR) {
-    const { x, z } = hexToWorld(offQ, offR);
-    const center = new THREE.Vector3(x, 0.55, z);
-    // a vertical glowing ring standing in the cracked wall, facing the Grid
-    const geo = new THREE.TorusGeometry(0.72, 0.14, 10, 30);
-    const mat = new THREE.MeshBasicMaterial({
-      color: 0x9fe9ff, transparent: true, opacity: 0.85,
-      blending: THREE.AdditiveBlending, depthWrite: false,
-    });
-    const ring = new THREE.Mesh(geo, mat);
-    ring.position.copy(center);
-    ring.lookAt(0, center.y, 0);
-    const discGeo = new THREE.CircleGeometry(0.7, 28);
-    const discMat = new THREE.MeshBasicMaterial({
-      color: 0x123, transparent: true, opacity: 0.5,
-      blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
-    });
-    const disc = new THREE.Mesh(discGeo, discMat);
-    disc.position.copy(center); disc.lookAt(0, center.y, 0);
-    this.scene.add(ring); this.scene.add(disc);
-    this.portals.push({ q: offQ, r: offR, edgeQ, edgeR, mesh: ring, disc, center });
-    // the crack: a flash, shockwave and flying shards
-    this.fx.flash(center, 0xffffff, 12, 0.4, 9);
-    this.fx.ring(center.clone().setY(0.2), 0xffffff, 2.6, 0.6);
-    this.fx.shrapnel(center, 0x9fe9ff, 12, 1.1);
-    this.fx.burst({ pos: center.clone(), count: 26, color: 0x9fe9ff, speed: 4, life: 0.7, size: 0.1 });
-    this.fx.shake(0.32);
-    this.audio.explosion(0.8);
+    // anchor the crack on the actual floor (the last on-grid edge cell), nudged
+    // a touch toward the boundary where the impact happened
+    const e = hexToWorld(edgeQ, edgeR);
+    const o = hexToWorld(offQ, offR);
+    const cx = e.x * 0.7 + o.x * 0.3, cz = e.z * 0.7 + o.z * 0.3;
+    const center = new THREE.Vector3(cx, 0.05, cz);
+
+    const positions = [];
+    const branches = 4 + Math.floor(this.rand() * 3);
+    for (let b = 0; b < branches; b++) {
+      let ang = (b / branches) * Math.PI * 2 + (this.rand() - 0.5) * 0.7;
+      let px = 0, pz = 0;
+      const segs = 2 + Math.floor(this.rand() * 3);
+      for (let s = 0; s < segs; s++) {
+        ang += (this.rand() - 0.5) * 0.9;                 // wander like a real crack
+        const len = 0.12 + this.rand() * 0.22;
+        const nx = px + Math.cos(ang) * len, nz = pz + Math.sin(ang) * len;
+        positions.push(px, 0, pz, nx, 0, nz);
+        px = nx; pz = nz;
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    // a thin, cool-grey hairline at low opacity — reads as a crack catching the
+    // faint ambient light, not a glow (no additive blending)
+    const mat = new THREE.LineBasicMaterial({ color: 0x223240, transparent: true, opacity: 0.5 });
+    const crack = new THREE.LineSegments(geo, mat);
+    crack.position.copy(center);
+    this.scene.add(crack);
+    this.portals.push({ q: offQ, r: offR, edgeQ, edgeR, mesh: crack, center });
+
+    // the impact is quiet: a little grit kicked up, a soft knock — nothing flashy
+    this.fx.burst({ pos: center.clone().setY(0.08), count: 7, color: 0x3a4650,
+      speed: 1.1, life: 0.5, size: 0.05, gravity: 3, spread: 0.5 });
+    this.fx.shake(0.07);
+    this.audio.blip();
   }
 
   _setCellPos(unit) {
