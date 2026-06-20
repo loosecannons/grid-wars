@@ -2551,7 +2551,7 @@ export class Game {
     // impact point like a struck pane. Thin ribbons, not 1px lines, so they hold
     // up at gameplay zoom.
     const pos = [];
-    const HW = 0.028; // half-width of a fracture line — thin, like a tile edge
+    const HW = 0.014; // half-width of a fracture line — thin & crisp, like a tile edge
     const v = (p) => { pos.push(p.x, p.y, p.z); };
     const ribbon = (sl, sr, el, er) => { v(sl); v(sr); v(er); v(sl); v(er); v(el); };
     const branches = 5 + Math.floor(this.rand() * 4);
@@ -2563,7 +2563,7 @@ export class Game {
         ang += (this.rand() - 0.5) * 1.0;                 // sharp, angular turns
         const len = 0.18 + this.rand() * 0.34;
         const nu = pu + Math.cos(ang) * len, nv = pv + Math.sin(ang) * len;
-        const nw = Math.max(0.012, pw * 0.82);            // taper a touch toward the tip
+        const nw = Math.max(0.007, pw * 0.9);             // barely taper — keep an even, crisp line
         const ex = -Math.sin(ang), ey = Math.cos(ang);    // perpendicular in the wall plane
         ribbon(
           W(pu + ex * pw, pv + ey * pw, 0), W(pu - ex * pw, pv - ey * pw, 0),
