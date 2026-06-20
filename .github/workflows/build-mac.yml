@@ -1,0 +1,48 @@
+# Build the GRID WARS macOS desktop app (Electron universal .dmg) and attach it
+# to the GitHub release. A manual run uploads it as a downloadable artifact.
+# The build is UNSIGNED (no Apple Developer cert), so Gatekeeper will warn on
+# first launch — users right-click → Open, or strip the quarantine attribute.
+name: Build macOS dmg
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install build tools (electron + builder, plus app deps)
+        run: npm install --no-save electron@^31.0.0 electron-builder@^24.13.3
+
+      - name: Build universal .dmg
+        run: npm run dist:mac
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false # don't attempt code signing
+
+      - name: List output
+        run: ls -lh dist-exe
+
+      - name: Attach .dmg to the release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist-exe/*.dmg
+
+      - name: Upload .dmg as an artifact (manual runs)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: gridwars-macos-dmg
+          path: dist-exe/*.dmg

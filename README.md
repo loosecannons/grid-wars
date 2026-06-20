@@ -91,11 +91,12 @@ docker run -p 8123:8123 gridwars
 
 Override the in-container port with `-e PORT=9000` (and map it).
 
-### Desktop app (Windows & Linux)
+### Desktop app (Windows, macOS & Linux)
 
-Portable desktop builds are attached to each [GitHub release](https://github.com/loosecannons/grid-wars/releases):
+Desktop builds are attached to each [GitHub release](https://github.com/loosecannons/grid-wars/releases):
 
 - **Windows** — `GRID-WARS-<version>-portable.exe`. Download and double-click; no install.
+- **macOS** — `GRID-WARS-<version>-universal.dmg` (Apple Silicon + Intel). Open it and drag the app to Applications.
 - **Linux** — `GRID-WARS-<version>-x86_64.AppImage`. `chmod +x` it and run; no install.
 
 Each is an [Electron](https://www.electronjs.org/) wrapper that runs the bundled
@@ -103,10 +104,15 @@ game **and** the multiplayer relay in a native window, so single-player and
 hosting/joining online games both work. (three.js and the Orbitron font still
 load from a CDN, so it needs an internet connection.)
 
+> **macOS:** the build is **unsigned** (no Apple Developer certificate), so
+> Gatekeeper will warn on first launch. Right-click the app → **Open** (then
+> confirm), or run `xattr -dr com.apple.quarantine "/Applications/GRID WARS.app"`.
+
 Build them yourself: `npm install electron electron-builder`, then
-`npm run dist:win` or `npm run dist:linux` (output in `dist-exe/`). The builds
-are produced in CI by
-[`build-windows.yml`](.github/workflows/build-windows.yml) and
+`npm run dist:win`, `npm run dist:mac`, or `npm run dist:linux` (output in
+`dist-exe/`). The builds are produced in CI by
+[`build-windows.yml`](.github/workflows/build-windows.yml),
+[`build-mac.yml`](.github/workflows/build-mac.yml) and
 [`build-linux.yml`](.github/workflows/build-linux.yml).
 
 ## Online multiplayer
