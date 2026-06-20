@@ -27,6 +27,8 @@ const TOP_DMG_BONUS = 2;    // extra damage a top-level recognizer suffers per h
 const RECO_COLLIDE_DMG = 3; // crash damage to both when a reco drops onto a unit
 const OVERDRIVE_SPEED = 6;  // a cycle at this velocity is flat out — strikes hit +1
 const MOMENTUM_SPEED = 5;   // FAST cycles can't stop — if not moved, they coast on
+const PORTAL_DROP_DMG = 4;  // a portal drop slams the unit on the landing hex
+const PORTAL_SELF_DMG = 2;  // …and rattles the cycle that came through
 const BARREL_ROLL_HEXES = 4; // a jet flying this many hexes straight does a 360° roll
 const TURRET_BUDGET = Math.PI / 3; // a tank may slew its turret up to 60° per turn
 const TURRET_STEP = Math.PI / 6;   // 30° per button press (capped by the budget)
@@ -247,6 +249,7 @@ export class Game {
     this.pushMode = false;
     this._undoStack = [];   // clean unit moves that can still be taken back
     this._combatSeq = 0;    // bumped on any damage — used to detect a fought move
+    this.portals = [];      // cracked boundary portals (easter egg, runtime only)
 
     // plan formations (rotated onto each faction's edge) before terrain,
     // so obstacles keep clear of every spawn zone — missions may give
@@ -2421,7 +2424,12 @@ export class Game {
     for (let i = 0; i < 2; i++) {
       q += dq; r += dr;
       const cell = this.cells.get(key(q, r));
-      if (!cell) { out.dies = true; out.cause = 'edge'; return out; }
+      if (!cell) {
+        out.dies = true; out.cause = 'edge';
+        out.edgeAt = { q, r };                       // off-grid hole coordinate
+        out.edgeFrom = { q: q - dq, r: r - dr };     // last on-grid cell
+        return out;
+      }
       if (cell.terrain === 'hole') {
         out.cells.push({ q, r });
         out.dies = true; out.cause = 'hole';
@@ -2491,11 +2499,127 @@ export class Game {
       await this.fx.tween(0.09, (k) => {
         unit.mesh.position.lerpVectors(from, dest, k);
       });
-      const pos = unit.mesh.position.clone();
-      pos.y += 1.3;
-      this.fx.floatText(pos, 'GRID BOUNDARY', '#ff5544');
-      this.fx.ring(unit.mesh.position.clone(), 0xffffff, 2.0, 0.4);
+      await this._hitBoundary(unit, pred.edgeAt, pred.edgeFrom);
+    }
+  }
+
+  // ---------- easter egg: cracked-boundary portals ----------
+  // A light cycle flung off the Grid at speed cracks the boundary wall. The
+  // first impact at a spot derezzes the rider but leaves a glowing PORTAL; later
+  // cycles that drive into that spot warp instead of dying — dropped in the
+  // middle (surviving only on a clear hex, slamming whatever is there, flyers
+  // included) or, if several portals exist, possibly out of another one.
+  _portalAt(q, r) { return this.portals.find((p) => p.q === q && p.r === r); }
+
+  async _hitBoundary(unit, off, edge) {
+    const existing = off && this._portalAt(off.q, off.r);
+    if (existing) { await this._enterPortal(unit, existing); return; }
+    const pos = unit.mesh.position.clone(); pos.y += 1.3;
+    this.fx.floatText(pos, 'WALL CRACKED', '#9fe9ff');
+    if (off) this._createPortal(off.q, off.r, edge ? edge.q : unit.q, edge ? edge.r : unit.r);
+    else this.fx.ring(unit.mesh.position.clone(), 0xffffff, 2.0, 0.4);
+    await this.applyDamage(unit, unit.hp);
+  }
+
+  _createPortal(offQ, offR, edgeQ, edgeR) {
+    const { x, z } = hexToWorld(offQ, offR);
+    const center = new THREE.Vector3(x, 0.55, z);
+    // a vertical glowing ring standing in the cracked wall, facing the Grid
+    const geo = new THREE.TorusGeometry(0.72, 0.14, 10, 30);
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0x9fe9ff, transparent: true, opacity: 0.85,
+      blending: THREE.AdditiveBlending, depthWrite: false,
+    });
+    const ring = new THREE.Mesh(geo, mat);
+    ring.position.copy(center);
+    ring.lookAt(0, center.y, 0);
+    const discGeo = new THREE.CircleGeometry(0.7, 28);
+    const discMat = new THREE.MeshBasicMaterial({
+      color: 0x123, transparent: true, opacity: 0.5,
+      blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
+    });
+    const disc = new THREE.Mesh(discGeo, discMat);
+    disc.position.copy(center); disc.lookAt(0, center.y, 0);
+    this.scene.add(ring); this.scene.add(disc);
+    this.portals.push({ q: offQ, r: offR, edgeQ, edgeR, mesh: ring, disc, center });
+    // the crack: a flash, shockwave and flying shards
+    this.fx.flash(center, 0xffffff, 12, 0.4, 9);
+    this.fx.ring(center.clone().setY(0.2), 0xffffff, 2.6, 0.6);
+    this.fx.shrapnel(center, 0x9fe9ff, 12, 1.1);
+    this.fx.burst({ pos: center.clone(), count: 26, color: 0x9fe9ff, speed: 4, life: 0.7, size: 0.1 });
+    this.fx.shake(0.32);
+    this.audio.explosion(0.8);
+  }
+
+  _setCellPos(unit) {
+    const { x, z } = hexToWorld(unit.q, unit.r);
+    const cell = this.cellOf(unit);
+    unit.mesh.position.set(x, (unit.baseY || 0) + TERRAIN_Y[cell ? cell.terrain : 'normal'], z);
+  }
+
+  async _enterPortal(unit, portal) {
+    // ride into the cracked wall and vanish
+    const into = portal.center.clone(); into.y = unit.baseY || 0;
+    const from = unit.mesh.position.clone();
+    unit.mesh.lookAt(into.x, unit.mesh.position.y, into.z);
+    await this.fx.tween(0.12, (k) => unit.mesh.position.lerpVectors(from, into, k));
+    this.fx.flash(portal.center.clone(), 0xffffff, 12, 0.3, 8);
+    this.fx.burst({ pos: portal.center.clone(), count: 20, color: 0x9fe9ff, speed: 4, life: 0.5, size: 0.1 });
+    unit.speed = 1; // the warp bleeds off all velocity
+
+    // destination: another portal (if several), else the middle of the Grid
+    const others = this.portals.filter((p) => p !== portal);
+    let target, emergePortal = null;
+    if (others.length && this.rand() < 0.5) {
+      emergePortal = others[Math.floor(this.rand() * others.length)];
+      target = { q: emergePortal.edgeQ, r: emergePortal.edgeR };
+    } else {
+      const cluster = [{ q: 0, r: 0 }].concat(DIRS.map(([dq, dr]) => ({ q: dq, r: dr })));
+      target = cluster[Math.floor(this.rand() * cluster.length)];
+    }
+    unit.q = target.q; unit.r = target.r;
+    const cell = this.cells.get(key(target.q, target.r));
+
+    if (emergePortal) {
+      // streak back out of the partner portal
+      const out = emergePortal.center.clone(); out.y = unit.baseY || 0;
+      unit.mesh.position.copy(out);
+      this.fx.flash(emergePortal.center.clone(), 0xffffff, 10, 0.3, 8);
+      this._setCellPos(unit);
+    } else {
+      // drop from the sky onto the centre
+      const { x, z } = hexToWorld(target.q, target.r);
+      unit.mesh.position.set(x, (unit.baseY || 0) + 9, z);
+      const groundY = (unit.baseY || 0) + (cell ? TERRAIN_Y[cell.terrain] : 0);
+      await this.fx.tween(0.32, (k) => { unit.mesh.position.y = (unit.baseY || 0) + 9 - k * (9 - (groundY - (unit.baseY || 0))); });
+      this.fx.shake(0.25);
+    }
+
+    // a pit / plateau / off-grid landing is not survivable
+    if (!cell || cell.terrain === 'hole' || cell.terrain === 'high') {
+      this.fx.floatText(unit.mesh.position.clone().setY(1.4), 'PORTAL — DEREZ', '#ff5544');
       await this.applyDamage(unit, unit.hp);
+      return;
+    }
+
+    // slam whatever is on the landing hex — even a flying unit
+    const occ = this.unitAt(target.q, target.r);
+    this.fx.floatText(unit.mesh.position.clone().setY(1.4), 'PORTAL DROP', '#c2fbff');
+    this.fx.explosion(unit.mesh.position.clone().setY(0.5), this.factionOf(unit).color, 0.7);
+    if (occ && occ !== unit) await this.applyDamage(occ, PORTAL_DROP_DMG, unit.side);
+    if (unit.alive) await this.applyDamage(unit, PORTAL_SELF_DMG);
+
+    // can't share a hex: if something survived under it, hop to the nearest clear
+    // cell — or derez if the centre is jammed solid
+    if (unit.alive) {
+      const clash = this.units.find((u) => u !== unit && u.alive && u.q === unit.q && u.r === unit.r);
+      if (clash) {
+        const alt = cellsInRange(this.cells, unit.q, unit.r, 2)
+          .filter((c) => c.terrain === 'normal' && !this.unitAt(c.q, c.r))
+          .sort((a, b) => hexDistance(unit, a) - hexDistance(unit, b))[0];
+        if (alt) { unit.q = alt.q; unit.r = alt.r; this._setCellPos(unit); }
+        else await this.applyDamage(unit, unit.hp);
+      }
     }
   }
 
@@ -2575,12 +2699,9 @@ export class Game {
         unit.mesh.position.clone().setY((unit.baseY || 0) + 1.4), 'COLLISION', '#ff5544');
       return this.applyDamage(unit, unit.hp);
     }
-    if (fatal === 'edge') { // sails off the Grid boundary
+    if (fatal === 'edge') { // sails off the Grid boundary — crack it / portal
       await this._coastLurch(unit, dir, 0.95);
-      this.fx.floatText(
-        unit.mesh.position.clone().setY((unit.baseY || 0) + 1.3), 'GRID BOUNDARY', '#ff5544');
-      this.fx.ring(unit.mesh.position.clone(), 0xffffff, 2.0, 0.4);
-      return this.applyDamage(unit, unit.hp);
+      return this._hitBoundary(unit, { q: nq, r: nr }, { q: unit.q, r: unit.r });
     }
     // pit or hostile wall — ride fully onto the cell, then derez
     await this._coastLurch(unit, dir, 1, nq, nr);

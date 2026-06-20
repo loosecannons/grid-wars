@@ -443,7 +443,8 @@ fire. The MCP applies the same rules and actively flanks.
   sitting still coasts back to SLOW. A FAST cycle that isn't moved coasts on.
 - **Overdrive**: spend your whole movement in a single straight move and the
   cycle slides **2 extra hexes** ahead and strikes for +1 — but the slide is
-  uncontrollable, and sliding into a pit or off the Grid derezzes you.
+  uncontrollable, and sliding into a pit or off the Grid derezzes you. _(Hit the
+  boundary hard enough and the wall might crack — find out what happens next.)_
 - **Light walls** stand until the start of your side's next turn. Your own
   team's walls are solid to you; any enemy cycle that drives into a wall is
   derezzed, and a derezzed cycle's walls collapse with it. Tanks demolish walls
