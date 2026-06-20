@@ -63,7 +63,7 @@ docker run -d --name gridwars -p 8123:8123 loosecannons/grid-wars:latest
 
 Then open **http://localhost:8123**. Stop it again with `docker rm -f gridwars`.
 
-- **Pin a version:** `loosecannons/grid-wars:1.3.1` (tags: `latest`, `1.3.1`, `1.3.0`, `1.2.1`, `1.2.0`, `1.1.0`, `1.0.0`).
+- **Pin a version:** `loosecannons/grid-wars:1.3.2` (tags: `latest`, `1.3.2`, `1.3.1`, `1.3.0`, `1.2.1`, `1.2.0`, `1.1.0`, `1.0.0`).
 - **Different host port:** `-p 9000:8123` → http://localhost:9000.
 - **docker compose:**
 
@@ -97,7 +97,8 @@ Desktop builds are attached to each [GitHub release](https://github.com/loosecan
 
 - **Windows** — `GRID-WARS-<version>-portable.exe`. Download and double-click; no install.
 - **macOS** — `GRID-WARS-<version>-universal.dmg` (Apple Silicon + Intel). Open it and drag the app to Applications.
-- **Linux** — `GRID-WARS-<version>-x86_64.AppImage`. `chmod +x` it and run; no install.
+- **Linux** — `GRID-WARS-<version>-x64.AppImage` (portable; `chmod +x` it and run),
+  or `GRID-WARS-<version>-x64.deb` for Debian/Ubuntu (`sudo apt install ./<file>.deb`).
 
 Each is an [Electron](https://www.electronjs.org/) wrapper that runs the bundled
 game **and** the multiplayer relay in a native window, so single-player and

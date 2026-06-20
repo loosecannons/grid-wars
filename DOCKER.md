@@ -50,10 +50,10 @@ docker rm -f gridwars
 | Tag        | Description                          |
 |------------|--------------------------------------|
 | `latest`   | Most recent build                    |
-| `1.3.1`    | Pinned release (recommended for prod)|
-| `1.3.0`    | Previous release                     |
+| `1.3.2`    | Pinned release (recommended for prod)|
+| `1.3.1`    | Previous release                     |
 
-Pin a version for reproducible deploys: `loosecannons/grid-wars:1.3.1`.
+Pin a version for reproducible deploys: `loosecannons/grid-wars:1.3.2`.
 
 ## Configuration
 

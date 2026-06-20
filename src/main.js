@@ -15,6 +15,7 @@ import { SIZES, COLOR_PALETTE } from './constants.js';
 import { CAMPAIGNS } from './campaigns.js';
 import { Net } from './net.js';
 import { MapEditor } from './editor.js';
+import { VERSION, REPO } from './version.js';
 
 // ---------- renderer / scene ----------
 
@@ -1513,3 +1514,43 @@ window.__game = game; // debug handle
 window.__camera = activeCamera; // debug handle (tracks modern/classic camera)
 window.__renderer = renderer; // debug handle (for on-demand frame capture)
 window.__composer = composer;  // debug handle (force a composite + read the canvas)
+
+// ---------- "new version available" check ----------
+// Ask GitHub for the latest release and, if it's newer than this build, show a
+// small dismissible pill on the start screen. Cached for a few hours; any
+// failure (offline, rate-limited) is silently ignored.
+function cmpVersion(a, b) {
+  const pa = String(a).split('.').map(Number), pb = String(b).split('.').map(Number);
+  for (let i = 0; i < 3; i++) { const d = (pa[i] || 0) - (pb[i] || 0); if (d) return d > 0 ? 1 : -1; }
+  return 0;
+}
+function showUpdateNotice(latest) {
+  if (localStorage.getItem('gw-upd-dismiss') === latest) return; // user dismissed this one
+  const el = document.getElementById('update-notice');
+  el.querySelector('.uv').textContent = 'v' + latest;
+  document.getElementById('update-link').href = 'https://github.com/' + REPO + '/releases/latest';
+  el.classList.add('show');
+  document.getElementById('update-dismiss').onclick = () => {
+    el.classList.remove('show');
+    try { localStorage.setItem('gw-upd-dismiss', latest); } catch (e) { /* ignore */ }
+  };
+}
+async function checkForUpdate() {
+  try {
+    const TTL = 6 * 3600 * 1000; // re-check at most every 6h
+    const last = +(localStorage.getItem('gw-upd-checked') || 0);
+    let latest = localStorage.getItem('gw-upd-latest');
+    if (!latest || Date.now() - last > TTL) {
+      const r = await fetch('https://api.github.com/repos/' + REPO + '/releases/latest',
+        { headers: { Accept: 'application/vnd.github+json' } });
+      if (!r.ok) return;
+      latest = String((await r.json()).tag_name || '').replace(/^v/, '');
+      try {
+        localStorage.setItem('gw-upd-latest', latest);
+        localStorage.setItem('gw-upd-checked', String(Date.now()));
+      } catch (e) { /* ignore */ }
+    }
+    if (latest && cmpVersion(latest, VERSION) > 0) showUpdateNotice(latest);
+  } catch (e) { /* offline / blocked — no notice */ }
+}
+checkForUpdate();

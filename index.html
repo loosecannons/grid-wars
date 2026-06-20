@@ -886,6 +886,36 @@
   #maps-list .rp-row .play span { font-size: 9px; opacity: .55; letter-spacing: 1px; display: block; margin-top: 3px; }
   #maps-list .rp-empty { font-size: 11px; letter-spacing: 2px; opacity: .5; max-width: 460px; line-height: 1.6; text-align: center; }
 
+  /* start-screen "new version available" pill (shown only on menus, when a newer
+     GitHub release exists) */
+  #update-notice {
+    position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 63;
+    display: none; align-items: center; gap: 8px;
+    padding: 6px 8px 6px 14px; border-radius: 18px;
+    background: rgba(3, 14, 20, .92); border: 1px solid var(--cyan);
+    box-shadow: 0 0 16px rgba(43, 217, 255, .4); pointer-events: auto;
+    animation: upd-in .5s cubic-bezier(.2, .7, .3, 1) both;
+  }
+  #update-notice.show { display: flex; }
+  body.in-game #update-notice, body.demo-mode #update-notice, body.replay-mode #update-notice { display: none !important; }
+  @keyframes upd-in { from { opacity: 0; transform: translate(-50%, -14px); } }
+  #update-link {
+    font-family: 'Orbitron', monospace; font-size: 10px; font-weight: 700;
+    letter-spacing: 2px; color: var(--cyan); text-decoration: none;
+    text-shadow: 0 0 8px var(--cyan);
+  }
+  #update-link:hover { text-decoration: underline; }
+  #update-link .uv { color: #fff; }
+  #update-dismiss {
+    width: 22px; height: 22px; padding: 0; font-size: 15px; line-height: 1;
+    border-radius: 50%; border: 1px solid var(--cyan-dim); color: var(--cyan);
+    background: none; cursor: pointer; box-shadow: none; text-shadow: none;
+  }
+  #update-dismiss:hover { background: rgba(43, 217, 255, .18); }
+  body.light #update-notice { background: #d3d6da; border-color: #8b9097; box-shadow: 0 2px 10px rgba(0,0,0,.25); }
+  body.light #update-link { color: #0b6e86; text-shadow: none; }
+  body.light #update-link .uv { color: #10222e; }
+
   /* ---------- map editor ---------- */
   #editor {
     position: fixed; inset: 0; z-index: 40; display: none;
@@ -1134,6 +1164,12 @@
     </div>
   </div>
 
+
+  <div id="update-notice">
+    <a id="update-link" href="https://github.com/loosecannons/grid-wars/releases" target="_blank" rel="noopener">
+      &#11014; NEW VERSION <span class="uv"></span> AVAILABLE — DOWNLOAD</a>
+    <button id="update-dismiss" title="Dismiss">&times;</button>
+  </div>
 
   <div id="startmenu">
     <div class="title">GRID WARS</div>
