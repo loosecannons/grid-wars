@@ -2527,47 +2527,52 @@ export class Game {
     const e = hexToWorld(edgeQ, edgeR);
     const o = hexToWorld(offQ, offR);
     const cx = e.x * 0.7 + o.x * 0.3, cz = e.z * 0.7 + o.z * 0.3;
-    const center = new THREE.Vector3(cx, 0.06, cz);
 
-    // Build the cracks as thin RIBBONS (flat quads) rather than 1px lines, which
-    // vanish at gameplay zoom. Each segment tapers from a wider root to a hair
-    // tip, like a real fracture. A muted ice-grey reads against the dark floor
-    // without glowing.
-    const verts = [];
-    const HALF = 0.05; // half-width of the crack root
+    // The crack is a real 3D fissure: each jagged segment is a V-groove cut into
+    // the floor — two inner walls dropping from a light, fractured rim to a dark
+    // void at the bottom, so you see INTO it. Vertex colours (no lighting) give
+    // the rim→void gradient; straight segments keep the edges crisp, like a
+    // crack in stone rather than a soft line.
+    const pos = [], col = [];
+    const RIM_Y = 0.10, BOT_Y = 0.004;
+    // rim sits just under the bloom threshold (~0.25 luma) so it reads as lit
+    // broken stone, NOT a glow; the void is near-black so you see depth
+    const RIM = [0.17, 0.21, 0.25];   // dim broken-stone rim catching the light
+    const VOID = [0.01, 0.02, 0.035]; // dark depth inside the fissure
+    const v = (p, c) => { pos.push(p[0], p[1], p[2]); col.push(c[0], c[1], c[2]); };
+    const tri = (a, ca, b, cb, c, cc) => { v(a, ca); v(b, cb); v(c, cc); };
     const branches = 4 + Math.floor(this.rand() * 3);
     for (let b = 0; b < branches; b++) {
-      let ang = (b / branches) * Math.PI * 2 + (this.rand() - 0.5) * 0.7;
-      let px = 0, pz = 0, pw = HALF;
+      let ang = (b / branches) * Math.PI * 2 + (this.rand() - 0.5) * 0.6;
+      let px = 0, pz = 0, pw = 0.055;
       const segs = 2 + Math.floor(this.rand() * 3);
       for (let s = 0; s < segs; s++) {
-        ang += (this.rand() - 0.5) * 0.9;                 // wander like a real crack
-        const len = 0.16 + this.rand() * 0.3;
+        ang += (this.rand() - 0.5) * 1.1;                 // sharp, angular turns
+        const len = 0.18 + this.rand() * 0.34;
         const nx = px + Math.cos(ang) * len, nz = pz + Math.sin(ang) * len;
-        const nw = pw * 0.6;                              // taper toward the tip
-        const perpX = -Math.sin(ang), perpZ = Math.cos(ang);
-        const aL = [px + perpX * pw, 0, pz + perpZ * pw];
-        const aR = [px - perpX * pw, 0, pz - perpZ * pw];
-        const bL = [nx + perpX * nw, 0, nz + perpZ * nw];
-        const bR = [nx - perpX * nw, 0, nz - perpZ * nw];
-        verts.push(...aL, ...aR, ...bL, ...aR, ...bR, ...bL); // two triangles
+        const nw = pw * 0.55;
+        const ex = -Math.sin(ang), ez = Math.cos(ang);    // perpendicular
+        const TLa = [px + ex * pw, RIM_Y, pz + ez * pw], TLb = [nx + ex * nw, RIM_Y, nz + ez * nw];
+        const TRa = [px - ex * pw, RIM_Y, pz - ez * pw], TRb = [nx - ex * nw, RIM_Y, nz - ez * nw];
+        const BOa = [px, BOT_Y, pz], BOb = [nx, BOT_Y, nz];
+        // left inner wall (rim → void) and right inner wall — two quads
+        tri(TLa, RIM, TLb, RIM, BOb, VOID); tri(TLa, RIM, BOb, VOID, BOa, VOID);
+        tri(TRa, RIM, BOa, VOID, BOb, VOID); tri(TRa, RIM, BOb, VOID, TRb, RIM);
         px = nx; pz = nz; pw = nw;
       }
     }
     const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
-    const mat = new THREE.MeshBasicMaterial({
-      color: 0x8aa6b8, transparent: true, opacity: 0.7,
-      depthWrite: false, side: THREE.DoubleSide,
-    });
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    const mat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
     const crack = new THREE.Mesh(geo, mat);
-    crack.position.copy(center);
+    crack.position.set(cx, 0, cz);
     crack.renderOrder = 2; // draw over the floor tiles
     this.scene.add(crack);
-    this.portals.push({ q: offQ, r: offR, edgeQ, edgeR, mesh: crack, center });
+    this.portals.push({ q: offQ, r: offR, edgeQ, edgeR, mesh: crack, center: new THREE.Vector3(cx, 0.06, cz) });
 
     // the impact is quiet: a little grit kicked up, a soft knock — nothing flashy
-    this.fx.burst({ pos: center.clone().setY(0.08), count: 9, color: 0x6f8593,
+    this.fx.burst({ pos: new THREE.Vector3(cx, 0.12, cz), count: 9, color: 0x6f8593,
       speed: 1.3, life: 0.6, size: 0.05, gravity: 3, spread: 0.5 });
     this.fx.shake(0.08);
     this.audio.blip();
