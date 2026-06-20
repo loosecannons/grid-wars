@@ -2522,58 +2522,67 @@ export class Game {
   // a few jagged hairline cracks radiating from where the cycle struck the
   // boundary. Easy to miss unless you're looking.
   _createPortal(offQ, offR, edgeQ, edgeR) {
-    // anchor the crack on the actual floor (the last on-grid edge cell), nudged
-    // a touch toward the boundary where the impact happened
+    // The Grid is ringed by an INVISIBLE boundary wall. A cycle slamming it leaves
+    // a crack on that wall — a vertical fracture standing up off the floor, like
+    // cracked glass. The wall itself stays invisible; only the crack shows, and
+    // nothing touches the floor.
     const e = hexToWorld(edgeQ, edgeR);
     const o = hexToWorld(offQ, offR);
-    const cx = e.x * 0.7 + o.x * 0.3, cz = e.z * 0.7 + o.z * 0.3;
+    const bx = e.x * 0.5 + o.x * 0.5, bz = e.z * 0.5 + o.z * 0.5; // impact point on the wall
+    const H = 0.75;                                               // up the wall, clear of the floor
+    const B = new THREE.Vector3(bx, H, bz);
 
-    // The crack is a real 3D fissure: each jagged segment is a V-groove cut into
-    // the floor — two inner walls dropping from a light, fractured rim to a dark
-    // void at the bottom, so you see INTO it. Vertex colours (no lighting) give
-    // the rim→void gradient; straight segments keep the edges crisp, like a
-    // crack in stone rather than a soft line.
+    // wall basis: inward normal (toward the Grid centre), a horizontal tangent
+    // along the wall, world up. The fissure's depth recedes OUTWARD into the
+    // wall so you see into it from inside the arena.
+    const inward = new THREE.Vector3(-bx, 0, -bz);
+    if (inward.lengthSq() < 1e-6) inward.set(0, 0, -1);
+    inward.normalize();
+    const tan = new THREE.Vector3(inward.z, 0, -inward.x);
+    const out = inward.clone().multiplyScalar(-1);
+    // local (u = along wall, v = up, d = depth into wall) → world, kept off the floor
+    const W = (u, vv, d) => new THREE.Vector3(
+      B.x + tan.x * u + out.x * d,
+      Math.max(0.07, H + vv),
+      B.z + tan.z * u + out.z * d);
+
     const pos = [], col = [];
-    const RIM_Y = 0.10, BOT_Y = 0.004;
-    // rim sits just under the bloom threshold (~0.25 luma) so it reads as lit
-    // broken stone, NOT a glow; the void is near-black so you see depth
-    const RIM = [0.17, 0.21, 0.25];   // dim broken-stone rim catching the light
-    const VOID = [0.01, 0.02, 0.035]; // dark depth inside the fissure
-    const v = (p, c) => { pos.push(p[0], p[1], p[2]); col.push(c[0], c[1], c[2]); };
+    const DEPTH = 0.13;
+    // rim sits just under the bloom threshold (~0.25 luma) so it reads as a lit,
+    // crisp fracture edge — NOT a glow; the void is near-black depth
+    const RIM = [0.18, 0.22, 0.26], VOID = [0.01, 0.02, 0.035];
+    const v = (p, c) => { pos.push(p.x, p.y, p.z); col.push(c[0], c[1], c[2]); };
     const tri = (a, ca, b, cb, c, cc) => { v(a, ca); v(b, cb); v(c, cc); };
-    const branches = 4 + Math.floor(this.rand() * 3);
+    const branches = 5 + Math.floor(this.rand() * 4); // radial cracks, like a struck pane
     for (let b = 0; b < branches; b++) {
-      let ang = (b / branches) * Math.PI * 2 + (this.rand() - 0.5) * 0.6;
-      let px = 0, pz = 0, pw = 0.055;
+      let ang = (b / branches) * Math.PI * 2 + (this.rand() - 0.5) * 0.5;
+      let pu = 0, pv = 0, pw = 0.05;
       const segs = 2 + Math.floor(this.rand() * 3);
       for (let s = 0; s < segs; s++) {
-        ang += (this.rand() - 0.5) * 1.1;                 // sharp, angular turns
-        const len = 0.18 + this.rand() * 0.34;
-        const nx = px + Math.cos(ang) * len, nz = pz + Math.sin(ang) * len;
+        ang += (this.rand() - 0.5) * 1.0;                 // sharp, angular turns
+        const len = 0.16 + this.rand() * 0.3;
+        const nu = pu + Math.cos(ang) * len, nv = pv + Math.sin(ang) * len;
         const nw = pw * 0.55;
-        const ex = -Math.sin(ang), ez = Math.cos(ang);    // perpendicular
-        const TLa = [px + ex * pw, RIM_Y, pz + ez * pw], TLb = [nx + ex * nw, RIM_Y, nz + ez * nw];
-        const TRa = [px - ex * pw, RIM_Y, pz - ez * pw], TRb = [nx - ex * nw, RIM_Y, nz - ez * nw];
-        const BOa = [px, BOT_Y, pz], BOb = [nx, BOT_Y, nz];
-        // left inner wall (rim → void) and right inner wall — two quads
+        const ex = -Math.sin(ang), ey = Math.cos(ang);    // perpendicular in the wall plane
+        const TLa = W(pu + ex * pw, pv + ey * pw, 0), TLb = W(nu + ex * nw, nv + ey * nw, 0);
+        const TRa = W(pu - ex * pw, pv - ey * pw, 0), TRb = W(nu - ex * nw, nv - ey * nw, 0);
+        const BOa = W(pu, pv, DEPTH), BOb = W(nu, nv, DEPTH);
         tri(TLa, RIM, TLb, RIM, BOb, VOID); tri(TLa, RIM, BOb, VOID, BOa, VOID);
         tri(TRa, RIM, BOa, VOID, BOb, VOID); tri(TRa, RIM, BOb, VOID, TRb, RIM);
-        px = nx; pz = nz; pw = nw;
+        pu = nu; pv = nv; pw = nw;
       }
     }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
     const mat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
-    const crack = new THREE.Mesh(geo, mat);
-    crack.position.set(cx, 0, cz);
-    crack.renderOrder = 2; // draw over the floor tiles
+    const crack = new THREE.Mesh(geo, mat);   // vertices are already world-space
     this.scene.add(crack);
-    this.portals.push({ q: offQ, r: offR, edgeQ, edgeR, mesh: crack, center: new THREE.Vector3(cx, 0.06, cz) });
+    this.portals.push({ q: offQ, r: offR, edgeQ, edgeR, mesh: crack, center: B.clone() });
 
-    // the impact is quiet: a little grit kicked up, a soft knock — nothing flashy
-    this.fx.burst({ pos: new THREE.Vector3(cx, 0.12, cz), count: 9, color: 0x6f8593,
-      speed: 1.3, life: 0.6, size: 0.05, gravity: 3, spread: 0.5 });
+    // the impact is quiet: a few sparks off the wall, a soft knock — nothing flashy
+    this.fx.burst({ pos: B.clone(), count: 10, color: 0x6f8593,
+      speed: 1.6, life: 0.6, size: 0.05, gravity: 4, spread: 0.6 });
     this.fx.shake(0.08);
     this.audio.blip();
   }
