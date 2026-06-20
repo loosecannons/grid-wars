@@ -63,7 +63,7 @@ docker run -d --name gridwars -p 8123:8123 loosecannons/grid-wars:latest
 
 Then open **http://localhost:8123**. Stop it again with `docker rm -f gridwars`.
 
-- **Pin a version:** `loosecannons/grid-wars:1.2.0` (tags: `latest`, `1.2.0`, `1.1.0`, `1.0.0`).
+- **Pin a version:** `loosecannons/grid-wars:1.2.1` (tags: `latest`, `1.2.1`, `1.2.0`, `1.1.0`, `1.0.0`).
 - **Different host port:** `-p 9000:8123` → http://localhost:9000.
 - **docker compose:**
 
