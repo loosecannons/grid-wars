@@ -187,6 +187,9 @@ export class Game {
     this.seed = seed;
     this.factionConfigs = configs;
     this.mods = mods;
+    // a custom map (from the editor, or a saved procedural grid) supplies explicit
+    // terrain + unit placements instead of the procedural formation/obstacle gen
+    this.customMap = restore ? null : ((gameOpts && gameOpts.customMap) || null);
     // a map may restrict which unit types can be built (null = all four)
     this.buildable = restore ? (restore.buildable || null)
       : (mods && mods.buildable) || null;
@@ -249,31 +252,38 @@ export class Game {
     // so obstacles keep clear of every spawn zone — missions may give
     // each faction a custom army
     const N = this.factions.length;
-    const plans = [];
-    // real (non-neutral) factions get an edge formation, spread evenly around
-    // the Grid; a neutral faction's flag-core sits dead centre
-    const realIdx = configs.map((c, i) => i).filter((i) => configs[i].controller !== 'neutral');
-    const M = Math.max(1, realIdx.length);
-    for (let i = 0; i < N; i++) {
-      const army = (mods && mods.armies && mods.armies[i]) || this.config.army;
-      if (configs[i].controller === 'neutral') {
-        plans.push({ side: i, type: 'core', q: 0, r: 0 });
-        let gi = 0; // idle guards ringed around the central core
-        for (const t of ['cycle', 'tank', 'reco', 'jet']) {
-          for (let c = 0; c < (army[t] || 0); c++) {
-            const dist = 1 + Math.floor(gi / 6);
-            const d = DIRS[gi % 6];
-            plans.push({ side: i, type: t, q: d[0] * dist, r: d[1] * dist });
-            gi++;
+    let plans = [];
+    if (this.customMap) {
+      // explicit placements straight from the saved map (cores included)
+      plans = (this.customMap.placements || [])
+        .filter((p) => this.factions[p.side] && UNIT_TYPES[p.type])
+        .map((p) => ({ side: p.side, type: p.type, q: p.q, r: p.r }));
+    } else {
+      // real (non-neutral) factions get an edge formation, spread evenly around
+      // the Grid; a neutral faction's flag-core sits dead centre
+      const realIdx = configs.map((c, i) => i).filter((i) => configs[i].controller !== 'neutral');
+      const M = Math.max(1, realIdx.length);
+      for (let i = 0; i < N; i++) {
+        const army = (mods && mods.armies && mods.armies[i]) || this.config.army;
+        if (configs[i].controller === 'neutral') {
+          plans.push({ side: i, type: 'core', q: 0, r: 0 });
+          let gi = 0; // idle guards ringed around the central core
+          for (const t of ['cycle', 'tank', 'reco', 'jet']) {
+            for (let c = 0; c < (army[t] || 0); c++) {
+              const dist = 1 + Math.floor(gi / 6);
+              const d = DIRS[gi % 6];
+              plans.push({ side: i, type: t, q: d[0] * dist, r: d[1] * dist });
+              gi++;
+            }
           }
+          continue;
         }
-        continue;
-      }
-      const base = buildFormation(this.config.radius, army);
-      const k = Math.round((realIdx.indexOf(i) * 6) / M) % 6;
-      for (const u of base) {
-        const p = rotate60(u.q, u.r, k);
-        plans.push({ side: i, type: u.type, q: p.q, r: p.r });
+        const base = buildFormation(this.config.radius, army);
+        const k = Math.round((realIdx.indexOf(i) * 6) / M) % 6;
+        for (const u of base) {
+          const p = rotate60(u.q, u.r, k);
+          plans.push({ side: i, type: u.type, q: p.q, r: p.r });
+        }
       }
     }
 
@@ -369,6 +379,13 @@ export class Game {
       for (const p of plans) {
         let { q, r } = p;
         const cell = this.cells.get(key(q, r));
+        if (this.customMap) {
+          // honour the editor's exact placement; only skip the impossible
+          // (off-grid, on a pit/plateau, or a hex already taken)
+          if (!cell || cell.terrain === 'hole' || cell.terrain === 'high' || this.unitAt(q, r)) continue;
+          this.spawn(p.side, p.type, q, r);
+          continue;
+        }
         if (!cell || cell.terrain !== 'normal' || this.unitAt(q, r)) {
           // crowded small maps: search wide so no unit is ever dropped
           const alt = cellsInRange(this.cells, q, r, 6)
@@ -434,6 +451,18 @@ export class Game {
     this.cells = generateMap(R);
     for (const cell of this.cells.values()) cell.terrain = 'normal';
 
+    if (this.customMap) {
+      // explicit terrain — no procedural obstacles/heals
+      for (const t of this.customMap.terrain || []) {
+        const cell = this.cells.get(key(t.q, t.r));
+        if (cell && (t.type === 'hole' || t.type === 'high' || t.type === 'heal')) {
+          cell.terrain = t.type;
+        }
+      }
+      this._renderTiles();
+      return;
+    }
+
     const spawnKeys = spawnPlans.map((p) => ({ q: p.q, r: p.r }));
     const nearSpawn = (c) => spawnKeys.some((s) => hexDistance(c, s) < 3);
 
@@ -468,6 +497,12 @@ export class Game {
       heals--;
     }
 
+    this._renderTiles();
+  }
+
+  // Build the tile meshes for the current `this.cells` terrain. Shared by the
+  // procedural and custom-map paths.
+  _renderTiles() {
     // flat (normal) cells — the overwhelming majority — render as ONE instanced
     // shader mesh; only the few special tiles stay as individual meshes
     const flatPositions = [];
@@ -498,6 +533,26 @@ export class Game {
     this.tileField = buildTileField(flatPositions);
     this.scene.add(this.tileField);
     this.pickMeshes.push(this.tileField);
+  }
+
+  // Export the current board (terrain + live unit placements + faction setup) as
+  // a custom-map object the backend can store and `customMap` can replay.
+  exportMap(name) {
+    const terrain = [];
+    for (const cell of this.cells.values()) {
+      if (cell.terrain && cell.terrain !== 'normal') {
+        terrain.push({ q: cell.q, r: cell.r, type: cell.terrain });
+      }
+    }
+    const placements = this.units.filter((u) => u.alive)
+      .map((u) => ({ side: u.side, type: u.type, q: u.q, r: u.r }));
+    const factions = (this.factionConfigs || []).map((c) => ({
+      color: c.color, controller: c.controller, team: c.team,
+    }));
+    return {
+      v: 1, name: name || 'GRID', sizeKey: this.sizeKey, radius: this.config.radius,
+      income: this.config.income, factions, terrain, placements,
+    };
   }
 
   spawn(side, type, q, r, forcedId = null) {

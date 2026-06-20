@@ -14,6 +14,7 @@ import { UI } from './ui.js';
 import { SIZES, COLOR_PALETTE } from './constants.js';
 import { CAMPAIGNS } from './campaigns.js';
 import { Net } from './net.js';
+import { MapEditor } from './editor.js';
 
 // ---------- renderer / scene ----------
 
@@ -474,8 +475,10 @@ let menuMusicWanted = true;
 function startGame(sizeKey, seed, factions, mods = null, restore = null, gameOpts = {}) {
   if (game.config) return; // already running — ignore stray menu clicks
   document.body.classList.add('in-game'); // reveals the in-game-only HUD (info icon)
-  document.getElementById('startmenu').style.display = 'none';
-  document.getElementById('setupmenu').style.display = 'none';
+  for (const m of ['startmenu', 'setupmenu', 'editor', 'mapsmenu', 'campaignmenu', 'rulesmenu']) {
+    const el = document.getElementById(m);
+    if (el) el.style.display = 'none';
+  }
   const credit = document.getElementById('credit');
   if (credit) credit.style.display = 'none';
   audio.init();
@@ -894,6 +897,100 @@ document.getElementById('replays-back').addEventListener('click', () => {
   ui._navBack = true; // reverse (fly-back-out) transition to the start menu
   ui.showStartMenu();
 });
+
+// ---------- map editor & custom maps ----------
+let mapEditor = null;
+function openEditor(loadMap) {
+  if (!mapEditor) {
+    mapEditor = new MapEditor(document.getElementById('editor-body'), {
+      onPlay: (map) => playCustomMap(map),
+      onSave: (map) => saveMapToServer(map),
+      onClose: () => { ui._navBack = true; ui.showStartMenu(); },
+    });
+    window.__mapEditor = mapEditor; // debug handle
+  }
+  ui.revealScreen('editor');
+  if (loadMap) mapEditor.load(loadMap);
+}
+async function saveMapToServer(map) {
+  try {
+    const r = await fetch('/api/maps', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(map),
+    });
+    return r.ok;
+  } catch (e) { return false; }
+}
+// Boot a game from a custom map: its faction setup becomes the combatants and
+// its terrain + placements override the procedural generation.
+function playCustomMap(map) {
+  const configs = (map.factions || []).map((f, i) => ({
+    name: f.name || ('PROGRAM ' + (i + 1)),
+    color: f.color || 0,
+    controller: f.controller || (i === 0 ? 'human' : 'ai'),
+    team: f.team || (i + 1),
+  }));
+  if (configs.length < 2 || !SIZES[map.sizeKey]) return;
+  game.mission = null;
+  game.sessionId = null; // a custom-map game is its own session
+  const seed = Math.floor(Math.random() * 1e9);
+  const mode = localStorage.getItem('gw-turnmode') || 'seq';
+  startGame(map.sizeKey, seed, configs, null, null,
+    { customMap: map, simultaneous: mode === 'sim', perUnitInit: mode === 'init' });
+}
+
+function showMapsMenu() {
+  ui.revealScreen('mapsmenu');
+  const list = document.getElementById('maps-list');
+  list.innerHTML = '<div class="rp-empty">LOADING GRIDS…</div>';
+  fetch('/api/maps').then((r) => r.json()).then(({ maps }) => {
+    list.innerHTML = '';
+    if (!maps || !maps.length) {
+      list.innerHTML = '<div class="rp-empty">NO SAVED MAPS YET — BUILD ONE IN THE EDITOR, OR SAVE A GENERATED GRID FROM THE IN-GAME MENU</div>';
+      return;
+    }
+    for (const m of maps) {
+      const row = document.createElement('div');
+      row.className = 'rp-row';
+      const play = document.createElement('button');
+      play.className = 'play';
+      play.innerHTML = esc(m.name) + '<span>' + (m.sizeKey || '?') + ' · ' + m.factions + ' FACTIONS · ' + m.units + ' UNITS</span>';
+      play.addEventListener('click', () => {
+        fetch('/api/maps/' + m.id).then((r) => r.json()).then((full) => playCustomMap(full));
+      });
+      const edit = document.createElement('button');
+      edit.className = 'small';
+      edit.textContent = 'EDIT';
+      edit.addEventListener('click', () => {
+        fetch('/api/maps/' + m.id).then((r) => r.json()).then((full) => openEditor(full));
+      });
+      const del = document.createElement('button');
+      del.className = 'small del';
+      del.textContent = '✕';
+      del.addEventListener('click', () => {
+        fetch('/api/maps/' + m.id, { method: 'DELETE' }).then(() => showMapsMenu());
+      });
+      row.appendChild(play); row.appendChild(edit); row.appendChild(del);
+      list.appendChild(row);
+    }
+  }).catch(() => {
+    list.innerHTML = '<div class="rp-empty">COULD NOT REACH THE MAP SERVER</div>';
+  });
+}
+
+// Save the CURRENT (often procedurally-generated) grid as a custom map.
+async function saveCurrentMap() {
+  if (!game.config) return;
+  const name = (window.prompt('Save this grid as a map. Name:', 'GRID ' + (game.sizeKey || '')) || '').trim();
+  if (!name) return;
+  const map = game.exportMap(name);
+  const ok = await saveMapToServer(map);
+  ui.showBanner(ok ? 'MAP SAVED' : 'SAVE FAILED', ok ? '#3dff7c' : '#ff5544', 1700);
+}
+
+document.getElementById('editor-btn').addEventListener('click', () => openEditor());
+document.getElementById('maps-btn').addEventListener('click', showMapsMenu);
+document.getElementById('maps-back').addEventListener('click', () => { ui._navBack = true; ui.showStartMenu(); });
+document.getElementById('btn-savemap').addEventListener('click', saveCurrentMap);
 
 // ---------- sessions: several games may be open at once ----------
 

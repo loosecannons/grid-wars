@@ -406,7 +406,7 @@
      display:none to flex, its panels rush in from deep space and settle
      into place, cascading one after another. Pure CSS, so every screen
      change (forward or back) replays it with no JS coordination. */
-  #startmenu, #setupmenu, #campaignmenu, #briefing, #lobby, #replaysmenu, #rulesmenu {
+  #startmenu, #setupmenu, #campaignmenu, #briefing, #lobby, #replaysmenu, #rulesmenu, #mapsmenu {
     perspective: 600px;
     perspective-origin: 50% 45%;
     /* backdrop stays solid & instant so the game is never revealed mid-swap;
@@ -422,11 +422,11 @@
      — rather than a default `#menu > *` rule — means removing a class lands on
      NO animation instead of re-triggering a default one (which would replay). */
   #startmenu.fly-in > *, #setupmenu.fly-in > *, #campaignmenu.fly-in > *,
-  #briefing.fly-in > *, #lobby.fly-in > *, #replaysmenu.fly-in > *, #rulesmenu.fly-in > * {
+  #briefing.fly-in > *, #lobby.fly-in > *, #replaysmenu.fly-in > *, #rulesmenu.fly-in > *, #mapsmenu.fly-in > * {
     animation: screen-fly-in .5s cubic-bezier(.2, .7, .3, 1) both;
   }
   #startmenu.exiting > *, #setupmenu.exiting > *, #campaignmenu.exiting > *,
-  #briefing.exiting > *, #lobby.exiting > *, #replaysmenu.exiting > *, #rulesmenu.exiting > * {
+  #briefing.exiting > *, #lobby.exiting > *, #replaysmenu.exiting > *, #rulesmenu.exiting > *, #mapsmenu.exiting > * {
     animation: screen-fly-out .42s cubic-bezier(.5, 0, .85, .35) both;
   }
   /* reverse direction — used for BACK / QUIT, so it feels like flying back
@@ -434,7 +434,7 @@
      return to swings in from the front (in front of the camera) and settles. */
   #startmenu.exiting-back > *, #setupmenu.exiting-back > *,
   #campaignmenu.exiting-back > *, #briefing.exiting-back > *,
-  #lobby.exiting-back > *, #replaysmenu.exiting-back > *, #rulesmenu.exiting-back > * {
+  #lobby.exiting-back > *, #replaysmenu.exiting-back > *, #rulesmenu.exiting-back > *, #mapsmenu.exiting-back > * {
     animation: screen-fly-out-back .42s cubic-bezier(.4, 0, .7, .5) both;
   }
   #startmenu.rev-in > *, #setupmenu.rev-in > *, #campaignmenu.rev-in > *,
@@ -856,6 +856,79 @@
   }
   /* push everything below the guru bar down by its height */
   body.guru-shift > *:not(#guru) { transform: translateY(96px); }
+
+  /* ---------- custom maps menu ---------- */
+  #mapsmenu {
+    position: fixed; inset: 0; z-index: 37; display: none;
+    align-items: center; justify-content: center; flex-direction: column; gap: 22px;
+    background: radial-gradient(ellipse at 50% 60%, rgba(8, 30, 42, .94), rgba(1, 5, 9, .97));
+  }
+  #mapsmenu .title { font-size: 30px; font-weight: 900; letter-spacing: 8px; text-shadow: 0 0 18px var(--cyan); }
+  #mapsmenu .sub2 { font-size: 11px; letter-spacing: 4px; opacity: .7; }
+  #maps-list { display: flex; flex-direction: column; gap: 8px; max-height: 56vh; overflow-y: auto; min-width: 460px; }
+  #maps-list .rp-row { display: flex; align-items: center; gap: 10px; }
+  #maps-list .rp-row .play { flex: 1; text-align: left; }
+  #maps-list .rp-row .play span { font-size: 9px; opacity: .55; letter-spacing: 1px; display: block; margin-top: 3px; }
+  #maps-list .rp-empty { font-size: 11px; letter-spacing: 2px; opacity: .5; max-width: 460px; line-height: 1.6; text-align: center; }
+
+  /* ---------- map editor ---------- */
+  #editor {
+    position: fixed; inset: 0; z-index: 40; display: none;
+    flex-direction: column; background: #02080d;
+  }
+  /* once a game is running these menu screens must stay hidden, even if an
+     in-flight fly-in transition tries to re-reveal them */
+  body.in-game #editor, body.in-game #mapsmenu { display: none !important; }
+  #editor-body { display: flex; flex-direction: column; width: 100%; height: 100%; }
+  #ed-bar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px;
+    padding: 10px 14px; border-bottom: 1px solid var(--cyan-dim);
+    background: rgba(3, 14, 20, .9); flex: 0 0 auto;
+  }
+  #ed-bar .ed-title { font-weight: 900; letter-spacing: 4px; color: var(--cyan); text-shadow: 0 0 12px var(--cyan); }
+  #ed-bar .ed-group { display: flex; align-items: center; gap: 5px; }
+  #ed-bar .ed-lab { font-size: 9px; letter-spacing: 2px; opacity: .55; }
+  #ed-bar .small { padding: 5px 9px; font-size: 10px; }
+  #ed-bar .small.on, #ed-bar .ed-tool.on { background: var(--cyan); color: #04141d; }
+  #ed-name {
+    font-family: 'Orbitron', monospace; font-size: 12px; letter-spacing: 2px;
+    padding: 6px 10px; width: 150px; color: var(--cyan);
+    background: rgba(3, 14, 20, .85); border: 1px solid var(--cyan-dim); outline: none;
+  }
+  #ed-bar .ed-actions { display: flex; gap: 6px; margin-left: auto; }
+  #ed-bar #ed-save { background: rgba(61, 255, 124, .15); border-color: #3dff7c; color: #3dff7c; }
+  #ed-bar #ed-play { background: rgba(43, 217, 255, .12); }
+  #ed-msg { flex: 0 0 100%; font-size: 10px; letter-spacing: 2px; min-height: 12px; color: #3dff7c; }
+  .ed-fac {
+    width: 26px; height: 26px; border-radius: 4px; border: 1px solid #02080c;
+    color: #02080c; font-weight: 900; font-size: 12px; cursor: pointer;
+    font-family: 'Orbitron', monospace; opacity: .6;
+  }
+  .ed-fac.on { opacity: 1; outline: 2px solid #fff; outline-offset: 1px; }
+  #ed-stage {
+    flex: 1 1 auto; overflow: auto; display: flex; align-items: center; justify-content: center;
+    padding: 16px; touch-action: none;
+    background: radial-gradient(ellipse at 50% 45%, rgba(8, 30, 42, .5), rgba(1, 5, 9, .9));
+  }
+  #ed-svg { width: min(92vw, 110vh); height: auto; max-height: 100%; }
+  .ed-hex { stroke: #1c4a5e; stroke-width: 1; cursor: crosshair; }
+  .ed-hex:hover { stroke: var(--cyan); stroke-width: 1.6; }
+  .ed-hex.ed-heal { stroke: #3dff7c; }
+  .ed-mk-text {
+    fill: #02080c; font-family: 'Orbitron', monospace; font-weight: 900;
+    font-size: 13px; text-anchor: middle; dominant-baseline: central; pointer-events: none;
+  }
+  body.light #editor { background: #c4c7cb; }
+  body.light #ed-bar { background: #d3d6da; border-bottom-color: #8b9097; }
+  body.light #ed-bar .ed-title { color: #0d3a52; text-shadow: none; }
+  body.light #ed-name { background: #e7e9ec; color: #1c2026; border-color: #8b9097; }
+  body.light #ed-stage { background: radial-gradient(ellipse at 50% 45%, #d7dadd, #b6b9bd); }
+  body.light .ed-hex { stroke: #9aa0a6; }
+  @media (max-width: 760px) {
+    #ed-bar { gap: 6px 8px; padding: 8px; }
+    #ed-bar .ed-actions { margin-left: 0; }
+    #maps-list { min-width: 0; width: 90vw; }
+  }
 </style>
 </head>
 <body>
@@ -1012,6 +1085,7 @@
     <div id="menu-panel">
       <button id="btn-invite" class="small" title="Open this game for friends to join or spectate via URL">&#128279; INVITE / SPECTATE</button>
       <button id="btn-manual-game" class="small" title="Read the manual / README">&#128214; MANUAL</button>
+      <button id="btn-savemap" class="small" title="Save this grid (terrain + unit layout) as a reusable custom map">&#128190; SAVE MAP</button>
       <button id="btn-restart-map" class="small" title="Restart this exact map">RESTART MAP</button>
       <button id="btn-quit" class="small" title="Back to grid selection (progress is auto-saved)">QUIT TO MENU</button>
     </div>
@@ -1041,6 +1115,8 @@
       <button data-mode="tutorial">TUTORIAL<span>BASIC TRAINING — 5 LESSONS</span></button>
       <button data-mode="proving">PROVING GROUNDS<span>UNIT TRIALS &amp; CAPTURE-THE-CORE — 6 MAPS</span></button>
       <button data-mode="grid_war">CAMPAIGN<span>THE GRID WAR — 5 MISSIONS</span></button>
+      <button id="maps-btn">CUSTOM MAPS<span>PLAY COMMUNITY &amp; SAVED GRIDS</span></button>
+      <button id="editor-btn">MAP EDITOR<span>BUILD YOUR OWN GRID</span></button>
       <button id="demo-btn">▶ DEMO REEL<span>WATCH FEATURES &amp; STRATEGY</span></button>
       <button id="replays-btn">REPLAYS<span>WATCH SAVED BATTLES</span></button>
     </div>
@@ -1090,6 +1166,17 @@
     <div class="sub2">WATCH A SAVED BATTLE</div>
     <div id="replays-list"></div>
     <button id="replays-back" class="small">BACK</button>
+  </div>
+
+  <div id="mapsmenu">
+    <div class="title">CUSTOM MAPS</div>
+    <div class="sub2">PLAY A SAVED GRID</div>
+    <div id="maps-list"></div>
+    <button id="maps-back" class="small">BACK</button>
+  </div>
+
+  <div id="editor">
+    <div id="editor-body"></div>
   </div>
 
   <div id="campaignmenu">

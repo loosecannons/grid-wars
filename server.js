@@ -11,6 +11,16 @@ const { WebSocketServer } = require('ws');
 
 const PORT = process.env.PORT || 8123;
 const ROOT = __dirname;
+// Custom maps are stored as JSON files here. Override with MAPS_DIR (e.g. a
+// Docker volume) to keep them across container restarts.
+const MAPS_DIR = process.env.MAPS_DIR || path.join(ROOT, 'maps');
+try { fs.mkdirSync(MAPS_DIR, { recursive: true }); } catch (e) { /* ignore */ }
+
+function sendJson(res, code, obj) {
+  res.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' });
+  res.end(JSON.stringify(obj));
+}
+const validMapId = (id) => /^[a-z0-9_-]{1,90}$/i.test(id) ? id : null;
 
 // Best guess at the machine's LAN IPv4 so invite links work from other devices
 // (phones/tablets) on the same network instead of pointing at `localhost`.
@@ -44,6 +54,62 @@ const server = http.createServer((req, res) => {
     res.end(JSON.stringify({ ip: process.env.PUBLIC_HOST || lanIPv4(), port: Number(PORT) }));
     return;
   }
+
+  // ---------- custom maps API ----------
+  if (urlPath === '/api/maps' && req.method === 'GET') {
+    fs.readdir(MAPS_DIR, (err, files) => {
+      const maps = [];
+      for (const f of files || []) {
+        if (!f.endsWith('.json')) continue;
+        try {
+          const m = JSON.parse(fs.readFileSync(path.join(MAPS_DIR, f), 'utf8'));
+          maps.push({
+            id: f.replace(/\.json$/, ''), name: m.name || '(unnamed)',
+            sizeKey: m.sizeKey || '?', factions: (m.factions || []).length,
+            units: (m.placements || []).length,
+          });
+        } catch (e) { /* skip unreadable */ }
+      }
+      maps.sort((a, b) => a.name.localeCompare(b.name));
+      sendJson(res, 200, { maps });
+    });
+    return;
+  }
+  if (urlPath === '/api/maps' && req.method === 'POST') {
+    let body = '';
+    req.on('data', (c) => { body += c; if (body.length > 4e6) req.destroy(); });
+    req.on('end', () => {
+      let m; try { m = JSON.parse(body); } catch (e) { return sendJson(res, 400, { error: 'bad json' }); }
+      if (!m || !Array.isArray(m.terrain) || !Array.isArray(m.placements)) {
+        return sendJson(res, 400, { error: 'invalid map' });
+      }
+      const base = String(m.name || 'map').toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'map';
+      const id = base + '-' + Math.random().toString(36).slice(2, 7);
+      try { fs.writeFileSync(path.join(MAPS_DIR, id + '.json'), JSON.stringify(m)); }
+      catch (e) { return sendJson(res, 500, { error: 'write failed' }); }
+      sendJson(res, 200, { id, name: m.name || '(unnamed)' });
+    });
+    return;
+  }
+  if (urlPath.startsWith('/api/maps/')) {
+    const id = validMapId(urlPath.slice('/api/maps/'.length));
+    if (!id) return sendJson(res, 400, { error: 'bad id' });
+    const mapFile = path.join(MAPS_DIR, id + '.json');
+    if (req.method === 'GET') {
+      fs.readFile(mapFile, (err, data) => {
+        if (err) return sendJson(res, 404, { error: 'not found' });
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' });
+        res.end(data);
+      });
+      return;
+    }
+    if (req.method === 'DELETE') {
+      fs.unlink(mapFile, (err) => sendJson(res, err ? 404 : 200, err ? { error: 'not found' } : { ok: true }));
+      return;
+    }
+  }
+
   const file = path.normalize(path.join(ROOT, urlPath));
   if (!file.startsWith(ROOT)) { res.writeHead(403); res.end(); return; }
   fs.readFile(file, (err, data) => {

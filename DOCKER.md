@@ -62,6 +62,14 @@ Pin a version for reproducible deploys: `loosecannons/grid-wars:1.2.1`.
 | `PORT`        | `8123`  | Port the server listens on (inside the container) |
 | `NODE_ENV`    | `production` | Node environment                    |
 | `PUBLIC_HOST` | _(auto)_ | Host/IP the lobby advertises in invite URLs + QR codes. Set this to the **host machine's LAN IP** (or domain) when running in Docker — the container's own IP isn't reachable from other devices. e.g. `-e PUBLIC_HOST=192.168.1.50`. |
+| `MAPS_DIR`    | `/app/maps` | Where custom maps (from the in-game editor / SAVE MAP) are stored. Mount a volume here to keep them across container restarts. |
+
+Persist custom maps with a volume:
+
+```bash
+docker run -d --name gridwars -p 8123:8123 \
+  -v gridwars-maps:/app/maps loosecannons/grid-wars:latest
+```
 
 Run on a different host port (container still listens on 8123):
 

@@ -169,6 +169,28 @@ which otherwise defaults to the map size). Changes are highlighted, persist in
 your browser, and **RESET** returns everything to stock. A custom match never
 leaks its values into the next game.
 
+## Map editor & custom maps
+
+Build your own grids and play them. From the start screen:
+
+- **MAP EDITOR** opens a 2D, top-down hex editor. Pick a **size** (S–XL), then
+  paint **terrain** (clear / pit / plateau / heal pad) and **place** cores and
+  units for each faction. The **FACTION** strip selects which side you're placing
+  for (click a swatch to select, double-click to recolour); **+ / −** add or
+  remove factions and the **HUMAN / MCP** button sets a faction's controller.
+  **▶ PLAY** test-drives the map immediately; **SAVE** stores it on the server.
+- **CUSTOM MAPS** lists every saved grid — **play**, **EDIT**, or delete it.
+- Each faction that has any units needs a **core**, and a map needs at least two
+  cored factions before it can be played or saved.
+
+You can also **save a procedurally-generated grid**: in any running game, open
+**☰ MENU → SAVE MAP** to store the current terrain *and* unit layout as a custom
+map you can replay or edit later.
+
+Maps are stored server-side as JSON (so this needs `server.js`, not a pure static
+host). The store lives in `maps/` by default — set `MAPS_DIR` (e.g. a Docker
+volume) to keep them across container restarts.
+
 ## Chat & voice
 
 A collapsible transmission panel (left) lets human players chat between

@@ -153,7 +153,7 @@ export class UI {
     // forward (into deeper screens) is the default. Consume it once.
     const back = !!this._navBack;
     this._navBack = false;
-    const MENUS = ['startmenu', 'setupmenu', 'campaignmenu', 'briefing', 'lobby', 'replaysmenu', 'rulesmenu'];
+    const MENUS = ['startmenu', 'setupmenu', 'campaignmenu', 'briefing', 'lobby', 'replaysmenu', 'rulesmenu', 'mapsmenu', 'editor'];
     const exitClass = back ? 'exiting-back' : 'exiting';
     const target = document.getElementById(id);
     const current = MENUS
