@@ -544,3 +544,20 @@ this software.)
 - `src/audio.js` — synthesized sound effects, voices, ambient Grid hum, music cues
 - `src/constants.js` — unit stats, costs, tunable rules, team colors, map sizes, formation generator
 - `server.js` — static file server + WebSocket relay for online play
+- `tests/` — Playwright regression suite (see below)
+
+## Tests
+
+A [Playwright](https://playwright.dev) regression suite drives the real game in
+a headless browser and asserts against the deterministic engine state
+(`window.__game`) and the live DOM — combat math, terrain, healing, the boundary
+portal, the map editor, the maps API, UI toggles, save/restore and the easter
+eggs. See [tests/README.md](tests/README.md) for the full coverage table.
+
+```bash
+npm install --no-save @playwright/test   # kept out of package.json deps
+npx playwright install chromium
+npm test
+```
+
+The suite also runs on every push / PR via `.github/workflows/test.yml`.

@@ -1,0 +1,31 @@
+name: regression tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  playwright:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # runtime deps only (keeps the lockfile / Docker `npm ci --omit=dev` valid)
+      - run: npm ci
+      # Playwright is a dev/test tool — installed ad-hoc, never added to deps
+      - run: npm install --no-save @playwright/test@^1.48
+      - run: npx playwright install --with-deps chromium
+      - run: npm test
+        env:
+          CI: '1'
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

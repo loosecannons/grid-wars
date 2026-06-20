@@ -8,6 +8,7 @@
   "main": "electron/main.cjs",
   "scripts": {
     "start": "node server.js",
+    "test": "playwright test",
     "electron": "electron .",
     "dist:win": "electron-builder --win portable --x64 --publish never",
     "dist:linux": "electron-builder --linux AppImage deb --x64 --publish never",
