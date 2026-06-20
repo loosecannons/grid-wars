@@ -56,19 +56,22 @@ export class UI {
       }
     });
 
-    // collapsible chat (state persists)
+    // collapsible chat (state persists). Hiding removes the whole transmissions
+    // panel and iconifies it to a corner button that brings it back.
     const chatEl = document.getElementById('chat');
     const chatToggle = document.getElementById('btn-chat-toggle');
-    const applyChatMin = (min) => {
+    const chatShow = document.getElementById('btn-chat-show');
+    const setChatMin = (min, persist) => {
       chatEl.classList.toggle('min', min);
-      chatToggle.textContent = min ? '+' : '—';
+      chatToggle.textContent = '—';
+      if (chatShow) chatShow.classList.toggle('show', min);
+      if (persist) {
+        try { localStorage.setItem('gw-chat-min', min ? '1' : '0'); } catch (e) { /* ignore */ }
+      }
     };
-    applyChatMin(localStorage.getItem('gw-chat-min') === '1');
-    chatToggle.addEventListener('click', () => {
-      const min = !chatEl.classList.contains('min');
-      applyChatMin(min);
-      try { localStorage.setItem('gw-chat-min', min ? '1' : '0'); } catch (e) { /* ignore */ }
-    });
+    setChatMin(localStorage.getItem('gw-chat-min') === '1', false);
+    chatToggle.addEventListener('click', () => setChatMin(true, true));
+    if (chatShow) chatShow.addEventListener('click', () => setChatMin(false, true));
 
     // grouped game menu (restart / quit / sound)
     const menuBtn = document.getElementById('btn-menu');
@@ -711,6 +714,8 @@ export class UI {
   openChat() {
     document.getElementById('chat').classList.remove('min');
     document.getElementById('btn-chat-toggle').textContent = '—';
+    const cs = document.getElementById('btn-chat-show');
+    if (cs) cs.classList.remove('show');
   }
 
   // ---------- HUD ----------

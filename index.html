@@ -268,8 +268,21 @@
     font-size: 9px; letter-spacing: 2px; opacity: .8;
   }
   #chat-head button { padding: 2px 10px; }
-  #chat.min #chat-body { display: none; }
+  /* hiding the chat removes the whole panel (header, log, input, voice) and
+     iconifies it to the corner restore button below */
+  #chat.min { display: none; }
   #chat-body { display: flex; flex-direction: column; gap: 6px; }
+  /* corner restore icon for a hidden transmissions panel — sits in the
+     top-right icon row, left of the info toggle; only meaningful in-game */
+  #btn-chat-show {
+    position: fixed; top: 12px; right: 138px; z-index: 62;
+    width: 34px; height: 34px; padding: 0; display: none;
+    align-items: center; justify-content: center; pointer-events: auto;
+  }
+  #btn-chat-show.show { display: flex; }
+  #btn-chat-show svg { display: block; }
+  body:not(.in-game) #btn-chat-show { display: none !important; }
+  body.demo-mode #btn-chat-show { display: none !important; }
 
   #menu-panel {
     position: absolute; left: 0; bottom: calc(100% + 8px);
@@ -292,7 +305,8 @@
   #hs-panel .hs-col { text-align: center; }
   #hs-panel .hs-size { font-weight: 900; letter-spacing: 2px; color: var(--cyan); }
 
-  .modes { display: flex; gap: 14px; }
+  .modes { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; }
+  .modes-break { flex-basis: 100%; height: 0; }
   .modes button { display: flex; flex-direction: column; gap: 6px; align-items: center; min-width: 190px; }
   .modes button span { font-size: 9px; font-weight: 500; letter-spacing: 1px; opacity: .6; }
 
@@ -655,10 +669,11 @@
     button.small { padding: 10px 12px; font-size: 11px; }
     #controls button { padding: 12px 14px; }
     #btn-endturn { padding: 12px 20px; }
-    #btn-sound, #btn-help, #btn-theme { width: 42px; height: 42px; top: 8px; }
+    #btn-sound, #btn-help, #btn-theme, #btn-chat-show { width: 42px; height: 42px; top: 8px; }
     #btn-sound { right: 10px; }
     #btn-theme { right: 60px; }
     #btn-help { right: 110px; }
+    #btn-chat-show { right: 160px; }
   }
 
   /* short viewports (landscape phones, small windows): let tall menus scroll
@@ -727,7 +742,7 @@
   body.light .swatch.sel { border-color: #1c2026; }
 
   /* the floating icon buttons get the same beveled grey treatment */
-  body.light #btn-sound, body.light #btn-help, body.light #btn-theme {
+  body.light #btn-sound, body.light #btn-help, body.light #btn-theme, body.light #btn-chat-show {
     color: #1c2026; background: #d3d6da; border: 1px solid #8b9097; text-shadow: none;
     box-shadow: inset 1.5px 1.5px 0 #f3f5f7, inset -1.5px -1.5px 0 #8a8f96;
   }
@@ -977,6 +992,16 @@
     </svg>
   </button>
 
+  <button id="btn-chat-show" title="Show transmissions" aria-label="Show transmissions">
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+         stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 5.5h16v10H8.5L4 19.5z" fill="currentColor" stroke="none" opacity=".18"></path>
+      <path d="M4 5.5h16v10H8.5L4 19.5z"></path>
+      <line x1="7.5" y1="9" x2="16.5" y2="9"></line>
+      <line x1="7.5" y1="12" x2="13.5" y2="12"></line>
+    </svg>
+  </button>
+
   <div id="topbar" class="hud">
     <div id="turn-count">CYCLE 01</div>
     <div id="turn-label">PROGRAM TURN</div>
@@ -1117,6 +1142,7 @@
       <button data-mode="proving">PROVING GROUNDS<span>UNIT TRIALS &amp; CAPTURE-THE-CORE — 6 MAPS</span></button>
       <button data-mode="grid_war">CAMPAIGN<span>THE GRID WAR — 5 MISSIONS</span></button>
       <button id="maps-btn">CUSTOM MAPS<span>PLAY COMMUNITY &amp; SAVED GRIDS</span></button>
+      <div class="modes-break"></div>
       <button id="editor-btn">MAP EDITOR<span>BUILD YOUR OWN GRID</span></button>
       <button id="demo-btn">▶ DEMO REEL<span>WATCH FEATURES &amp; STRATEGY</span></button>
       <button id="replays-btn">REPLAYS<span>WATCH SAVED BATTLES</span></button>
