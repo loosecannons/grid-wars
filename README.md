@@ -97,8 +97,8 @@ Desktop builds are attached to each [GitHub release](https://github.com/loosecan
 
 - **Windows** — `GRID-WARS-<version>-portable.exe`. Download and double-click; no install.
 - **macOS** — `GRID-WARS-<version>-universal.dmg` (Apple Silicon + Intel). Open it and drag the app to Applications.
-- **Linux** — `GRID-WARS-<version>-x64.AppImage` (portable; `chmod +x` it and run),
-  or `GRID-WARS-<version>-x64.deb` for Debian/Ubuntu (`sudo apt install ./<file>.deb`).
+- **Linux** — `GRID-WARS-<version>-x86_64.AppImage` (portable; `chmod +x` it and run),
+  or `GRID-WARS-<version>-amd64.deb` for Debian/Ubuntu (`sudo apt install ./<file>.deb`).
 
 Each is an [Electron](https://www.electronjs.org/) wrapper that runs the bundled
 game **and** the multiplayer relay in a native window, so single-player and
