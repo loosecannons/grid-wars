@@ -44,7 +44,11 @@ const MIME = {
 };
 
 const server = http.createServer((req, res) => {
-  let urlPath = decodeURIComponent(req.url.split('?')[0]);
+  // a malformed percent-escape (e.g. a bare "%") makes decodeURIComponent throw;
+  // catch it here so one bad request can't crash the process (and every live room)
+  let urlPath;
+  try { urlPath = decodeURIComponent(req.url.split('?')[0]); }
+  catch (e) { res.writeHead(400); res.end('bad request'); return; }
   if (urlPath === '/') urlPath = '/index.html';
   // host network info — lets the lobby build LAN-reachable invite URLs + QR
   if (urlPath === '/__net') {
@@ -111,7 +115,9 @@ const server = http.createServer((req, res) => {
   }
 
   const file = path.normalize(path.join(ROOT, urlPath));
-  if (!file.startsWith(ROOT)) { res.writeHead(403); res.end(); return; }
+  // contain strictly to ROOT — a bare startsWith() would also accept a sibling
+  // dir sharing ROOT's name prefix (…/cms vs …/cms-secret) reached via "../"
+  if (file !== ROOT && !file.startsWith(ROOT + path.sep)) { res.writeHead(403); res.end(); return; }
   fs.readFile(file, (err, data) => {
     if (err) { res.writeHead(404); res.end('not found'); return; }
     res.writeHead(200, {
@@ -135,7 +141,8 @@ function send(ws, obj) {
   if (ws && ws.readyState === ws.OPEN) ws.send(JSON.stringify(obj));
 }
 
-const wss = new WebSocketServer({ server });
+// cap each frame at 1 MiB so a single oversized message can't balloon memory
+const wss = new WebSocketServer({ server, maxPayload: 1 << 20 });
 
 wss.on('connection', (ws) => {
   const id = 'c' + (nextClient++);
