@@ -2546,47 +2546,40 @@ export class Game {
       Math.max(0.07, H + vv),
       B.z + tan.z * u + out.z * d);
 
-    const pos = [], col = [];
-    const DEPTH = 0.09, LIP = 0.035; // recess depth, and the thin lit edge width
-    // a bright crisp fracture edge (just under the ~0.25 bloom threshold, so no
-    // glow) framing a flat, near-black void you see into. The transition is a
-    // short vertical lip, not a smooth gradient — so the edges read HARD.
-    const RIM = [0.20, 0.24, 0.28], VOID = [0.008, 0.016, 0.03];
-    const v = (p, c) => { pos.push(p.x, p.y, p.z); col.push(c[0], c[1], c[2]); };
-    const tri = (a, ca, b, cb, c, cc) => { v(a, ca); v(b, cb); v(c, cc); };
-    const branches = 5 + Math.floor(this.rand() * 4); // radial cracks, like a struck pane
+    // Draw the crack in the same WIREFRAME style as the hex grid: thin glowing
+    // cyan lines (the exact hex-edge colour, which blooms), radiating from the
+    // impact point like a struck pane. Thin ribbons, not 1px lines, so they hold
+    // up at gameplay zoom.
+    const pos = [];
+    const HW = 0.028; // half-width of a fracture line — thin, like a tile edge
+    const v = (p) => { pos.push(p.x, p.y, p.z); };
+    const ribbon = (sl, sr, el, er) => { v(sl); v(sr); v(er); v(sl); v(er); v(el); };
+    const branches = 5 + Math.floor(this.rand() * 4);
     for (let b = 0; b < branches; b++) {
       let ang = (b / branches) * Math.PI * 2 + (this.rand() - 0.5) * 0.5;
-      let pu = 0, pv = 0, pw = 0.13;                     // WIDER root
+      let pu = 0, pv = 0, pw = HW;
       const segs = 2 + Math.floor(this.rand() * 3);
       for (let s = 0; s < segs; s++) {
         ang += (this.rand() - 0.5) * 1.0;                 // sharp, angular turns
         const len = 0.18 + this.rand() * 0.34;
         const nu = pu + Math.cos(ang) * len, nv = pv + Math.sin(ang) * len;
-        const nw = pw * 0.72;                             // gentler taper → stays wide
+        const nw = Math.max(0.012, pw * 0.82);            // taper a touch toward the tip
         const ex = -Math.sin(ang), ey = Math.cos(ang);    // perpendicular in the wall plane
-        const wcA = Math.max(0.006, pw - LIP), wcB = Math.max(0.006, nw - LIP);
-        // outer rim (lit, on the wall surface) and inner edge (dark, recessed)
-        const TLa = W(pu + ex * pw, pv + ey * pw, 0), TLb = W(nu + ex * nw, nv + ey * nw, 0);
-        const TRa = W(pu - ex * pw, pv - ey * pw, 0), TRb = W(nu - ex * nw, nv - ey * nw, 0);
-        const ILa = W(pu + ex * wcA, pv + ey * wcA, DEPTH), ILb = W(nu + ex * wcB, nv + ey * wcB, DEPTH);
-        const IRa = W(pu - ex * wcA, pv - ey * wcA, DEPTH), IRb = W(nu - ex * wcB, nv - ey * wcB, DEPTH);
-        tri(TLa, RIM, TLb, RIM, ILb, VOID); tri(TLa, RIM, ILb, VOID, ILa, VOID);   // left lit edge → recess
-        tri(ILa, VOID, ILb, VOID, IRb, VOID); tri(ILa, VOID, IRb, VOID, IRa, VOID); // flat dark void floor
-        tri(TRa, RIM, IRa, VOID, IRb, VOID); tri(TRa, RIM, IRb, VOID, TRb, RIM);   // right lit edge → recess
+        ribbon(
+          W(pu + ex * pw, pv + ey * pw, 0), W(pu - ex * pw, pv - ey * pw, 0),
+          W(nu + ex * nw, nv + ey * nw, 0), W(nu - ex * nw, nv - ey * nw, 0));
         pu = nu; pv = nv; pw = nw;
       }
     }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-    const mat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
+    const mat = new THREE.MeshBasicMaterial({ color: 0x176f86, side: THREE.DoubleSide }); // hex-edge cyan
     const crack = new THREE.Mesh(geo, mat);   // vertices are already world-space
     this.scene.add(crack);
     this.portals.push({ q: offQ, r: offR, edgeQ, edgeR, mesh: crack, center: B.clone() });
 
-    // the impact is quiet: a few sparks off the wall, a soft knock — nothing flashy
-    this.fx.burst({ pos: B.clone(), count: 10, color: 0x6f8593,
+    // the impact is quiet: a few cyan sparks off the wall, a soft knock
+    this.fx.burst({ pos: B.clone(), count: 10, color: 0x39c6e6,
       speed: 1.6, life: 0.6, size: 0.05, gravity: 4, spread: 0.6 });
     this.fx.shake(0.08);
     this.audio.blip();
