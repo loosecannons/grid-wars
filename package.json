@@ -1,6 +1,6 @@
 {
   "name": "tron-grid-wars",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "private": true,
   "description": "GRID WARS - a TRON tactics game with online multiplayer",
   "type": "commonjs",
