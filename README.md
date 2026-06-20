@@ -91,6 +91,19 @@ docker run -p 8123:8123 gridwars
 
 Override the in-container port with `-e PORT=9000` (and map it).
 
+### Windows desktop app (.exe)
+
+A portable Windows build is attached to each [GitHub release](https://github.com/loosecannons/grid-wars/releases)
+(`GRID-WARS-<version>-portable.exe`). Download and double-click it — no install.
+It's an [Electron](https://www.electronjs.org/) wrapper that runs the bundled
+game **and** the multiplayer relay in a native window, so single-player and
+hosting/joining online games both work. (three.js and the Orbitron font still
+load from a CDN, so it needs an internet connection.)
+
+Build it yourself: `npm install electron electron-builder && npm run dist:win`
+(output in `dist-exe/`). The build is produced in CI by
+[`.github/workflows/build-windows.yml`](.github/workflows/build-windows.yml).
+
 ## Online multiplayer
 
 **Pre-game lobby** (recommended): on the combatant setup screen, press

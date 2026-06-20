@@ -1,0 +1,46 @@
+# Build the GRID WARS Windows desktop app (Electron, portable .exe) and attach
+# it to the GitHub release. A manual run uploads it as a downloadable artifact.
+# Electron/electron-builder are installed ad-hoc (not in package.json deps) so
+# the Docker pipeline's `npm ci --omit=dev` stays unaffected.
+name: Build Windows exe
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install build tools (electron + builder, plus app deps)
+        run: npm install --no-save electron@^31.0.0 electron-builder@^24.13.3
+
+      - name: Build portable .exe
+        run: npm run dist:win
+
+      - name: List output
+        run: dir dist-exe
+
+      - name: Attach .exe to the release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist-exe/*.exe
+
+      - name: Upload .exe as an artifact (manual runs)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: gridwars-windows-portable
+          path: dist-exe/*.exe
