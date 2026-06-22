@@ -47,6 +47,26 @@ test.describe('serialize / restore', () => {
     expect(r.idsUnique).toBe(true); // ids line up across network clients
   });
 
+  test('mid-round focus-fire state survives serialize/restore', async ({ page }) => {
+    await bootSkirmish(page);
+    const r = await page.evaluate(() => {
+      const g = window.__game;
+      const u = g.units.find((x) => x.alive && x.type !== 'core');
+      u.focusHits = 3; // a unit that has been focus-fired this round
+      const snap = JSON.parse(JSON.stringify(g.serialize()));
+      const snapU = snap.units.find((x) => x.id === u.id);
+      u.focusHits = 99; // diverge the live original from the snapshot
+      // re-init from the snapshot (resume path; init appends, so the rebuilt
+      // unit is the LAST one with this id — reading it proves restore set it)
+      g.init(snap.sizeKey, snap.seed, snap.configs, snap.mods, snap, {});
+      const matches = g.units.filter((x) => x.id === u.id);
+      const restored = matches[matches.length - 1];
+      return { snapped: snapU && snapU.focusHits, restored: restored ? restored.focusHits : null };
+    });
+    expect(r.snapped).toBe(3); // serialized, not dropped to 0
+    expect(r.restored).toBe(3); // restore read the snapshot's 3, not the live 99
+  });
+
   test('exportMap captures terrain and live placements', async ({ page }) => {
     await bootSkirmish(page);
     const r = await page.evaluate(() => {

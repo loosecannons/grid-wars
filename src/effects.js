@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 
 const UP = new THREE.Vector3(0, 1, 0);
+// reused read-only white endpoint for per-frame colour lerps (never mutated)
+const WHITE = new THREE.Color(0xffffff);
 
 export class FX {
   constructor(scene, audio) {
@@ -204,7 +206,7 @@ export class FX {
     this.tween(0.45, (k) => {
       ball.scale.setScalar(1 + k * 4 * s);
       mat.opacity = 1 - k;
-      mat.color.lerpColors(new THREE.Color(0xffffff), c, Math.min(1, k * 2));
+      mat.color.lerpColors(WHITE, c, Math.min(1, k * 2));
     }, () => { this.scene.remove(ball); geo.dispose(); mat.dispose(); });
   }
 
@@ -259,7 +261,7 @@ export class FX {
       colMat.opacity = 0.85 * (1 - k);
       col.scale.x = col.scale.z = 1 - k * 0.6;
       col.scale.y = 1 + k * 0.8;
-      colMat.color.lerpColors(new THREE.Color(0xffffff), cc, k);
+      colMat.color.lerpColors(WHITE, cc, k);
     }, () => { this.scene.remove(col); colGeo.dispose(); colMat.dispose(); });
     // warm embers drifting up out of the wreckage
     this.burst({

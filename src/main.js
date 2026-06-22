@@ -268,6 +268,15 @@ const audio = new AudioFX();
 const fx = new FX(scene, audio);
 const game = new Game(scene, fx, audio, ui);
 
+// The turn driver runs as un-awaited fire-and-forget promises; a throw deep in
+// it (AI hitting a null unit, a desynced replay) would otherwise silently
+// freeze the game mid-turn with no recovery. Surface it as a fault banner.
+window.addEventListener('unhandledrejection', (e) => {
+  console.error('GRID FAULT (unhandled rejection):', e.reason);
+  if (game) { game.over = true; game.busy = false; }
+  try { ui.showBanner('GRID FAULT — RELOAD TO CONTINUE', '#ff5544', 6000); } catch (_) { /* pre-boot */ }
+});
+
 applyRenderMode(); // set the persisted render mode now that `game` exists
 
 ui.setEndTurnEnabled(false);
@@ -961,7 +970,7 @@ function showMapsMenu() {
       row.className = 'rp-row';
       const play = document.createElement('button');
       play.className = 'play';
-      play.innerHTML = esc(m.name) + '<span>' + (m.sizeKey || '?') + ' · ' + m.factions + ' FACTIONS · ' + m.units + ' UNITS</span>';
+      play.innerHTML = esc(m.name) + '<span>' + esc(m.sizeKey || '?') + ' · ' + m.factions + ' FACTIONS · ' + m.units + ' UNITS</span>';
       play.addEventListener('click', () => {
         fetch('/api/maps/' + m.id).then((r) => r.json()).then((full) => playCustomMap(full));
       });

@@ -48,6 +48,9 @@ app.whenReady().then(async () => {
   process.env.PORT = String(port);
   // custom maps must live somewhere writable (the packaged app is read-only)
   process.env.MAPS_DIR = path.join(app.getPath('userData'), 'maps');
+  // the desktop app only ever loads 127.0.0.1 — keep the server loopback-only so
+  // the unauthenticated maps API + WS relay aren't exposed to the whole LAN
+  process.env.BIND_HOST = '127.0.0.1';
   require(path.join(__dirname, '..', 'server.js')); // start HTTP + WS relay
   waitForServer(port, createWindow);
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });

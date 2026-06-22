@@ -132,6 +132,12 @@ const server = http.createServer((req, res) => {
 
 const rooms = new Map(); // roomId -> { hostId, clients: Map(clientId -> ws) }
 let nextClient = 1;
+let liveConns = 0;
+// cheap caps so an anonymous client (notably on the documented public-exposure
+// path) can't exhaust memory by spamming rooms / joins / connections
+const MAX_ROOMS = 500;
+const MAX_CLIENTS_PER_ROOM = 16;
+const MAX_CONNS = 1000;
 
 function roomId() {
   return Math.random().toString(36).slice(2, 8).toUpperCase();
@@ -141,10 +147,25 @@ function send(ws, obj) {
   if (ws && ws.readyState === ws.OPEN) ws.send(JSON.stringify(obj));
 }
 
+// Remove a client from a room, notify the survivors, and drop the room when its
+// host leaves or it empties — so a socket can never orphan a room it abandons.
+function leaveRoom(rid, id) {
+  const room = rid && rooms.get(rid);
+  if (!room || !room.clients.has(id)) return;
+  room.clients.delete(id);
+  const hostGone = room.hostId === id;
+  for (const [, cws] of room.clients) {
+    send(cws, { t: hostGone ? 'host-left' : 'left', id });
+  }
+  if (hostGone || room.clients.size === 0) rooms.delete(rid);
+}
+
 // cap each frame at 1 MiB so a single oversized message can't balloon memory
 const wss = new WebSocketServer({ server, maxPayload: 1 << 20 });
 
 wss.on('connection', (ws) => {
+  if (liveConns >= MAX_CONNS) { ws.close(); return; }
+  liveConns++;
   const id = 'c' + (nextClient++);
   let myRoom = null;
 
@@ -153,6 +174,8 @@ wss.on('connection', (ws) => {
     try { m = JSON.parse(raw); } catch (e) { return; }
 
     if (m.t === 'create') {
+      if (rooms.size >= MAX_ROOMS) { send(ws, { t: 'err', m: 'GRID AT CAPACITY' }); return; }
+      leaveRoom(myRoom, id);                  // never accumulate orphaned rooms
       let rid = roomId();
       while (rooms.has(rid)) rid = roomId();
       rooms.set(rid, { hostId: id, clients: new Map([[id, ws]]) });
@@ -162,6 +185,10 @@ wss.on('connection', (ws) => {
     } else if (m.t === 'join') {
       const room = rooms.get(m.room);
       if (!room) { send(ws, { t: 'err', m: 'NO SUCH GRID' }); return; }
+      if (!room.clients.has(id) && room.clients.size >= MAX_CLIENTS_PER_ROOM) {
+        send(ws, { t: 'err', m: 'GRID FULL' }); return;
+      }
+      if (myRoom && myRoom !== m.room) leaveRoom(myRoom, id); // leave any prior room first
       room.clients.set(id, ws);
       myRoom = m.room;
       send(ws, { t: 'joined', room: m.room, id });
@@ -171,29 +198,27 @@ wss.on('connection', (ws) => {
     } else if (m.t === 'cast' && myRoom) {
       const room = rooms.get(myRoom);
       if (!room) return;
+      const host = id === room.hostId;        // stamp origin so peers can trust control msgs
       for (const [cid, cws] of room.clients) {
-        if (cid !== id) send(cws, { t: 'msg', from: id, d: m.d });
+        if (cid !== id) send(cws, { t: 'msg', from: id, host, d: m.d });
       }
 
     } else if (m.t === 'to' && myRoom) {
       const room = rooms.get(myRoom);
-      if (!room) return;
-      send(room.clients.get(m.target), { t: 'msg', from: id, d: m.d });
+      if (!room || id !== room.hostId) return; // directed messages are host-only
+      send(room.clients.get(m.target), { t: 'msg', from: id, host: true, d: m.d });
     }
   });
 
   ws.on('close', () => {
-    const room = myRoom && rooms.get(myRoom);
-    if (!room) return;
-    room.clients.delete(id);
-    const hostGone = room.hostId === id;
-    for (const [, cws] of room.clients) {
-      send(cws, { t: hostGone ? 'host-left' : 'left', id });
-    }
-    if (hostGone || room.clients.size === 0) rooms.delete(myRoom);
+    liveConns--;
+    leaveRoom(myRoom, id);
   });
 });
 
-server.listen(PORT, () => {
+// loopback-only when BIND_HOST is set (the desktop app does this); otherwise
+// bind all interfaces so LAN peers can reach a deliberately-hosted game
+const HOST = process.env.BIND_HOST || '0.0.0.0';
+server.listen(PORT, HOST, () => {
   console.log('GRID WARS online at http://localhost:' + PORT);
 });

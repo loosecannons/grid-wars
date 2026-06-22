@@ -24,13 +24,32 @@ export class Net {
     return new Promise((resolve, reject) => {
       const proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
       const ws = new WebSocket(proto + location.host);
-      ws.onopen = () => { this.ws = ws; resolve(); };
-      ws.onerror = () => reject(new Error('no relay'));
-      ws.onmessage = (ev) => this._onMessage(JSON.parse(ev.data));
+      this.ws = ws;
+      let opened = false;
+      ws.onopen = () => { opened = true; resolve(); };
+      ws.onerror = () => { if (!opened) reject(new Error('no relay')); this._onLinkLost(); };
+      ws.onmessage = (ev) => {
+        let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+        this._onMessage(m);
+      };
       ws.onclose = () => {
         if (this.room) this.ui.addChat('SYSTEM', '#e8f6ff', 'LINK TO THE GRID LOST.', false);
+        this._onLinkLost();
       };
     });
+  }
+
+  // The relay link is gone — settle anything awaiting it (a pending join, the
+  // turn-end wait) so the client surfaces the loss instead of hanging forever.
+  _onLinkLost() {
+    this._resolveWelcome(null);
+    if (this.game && this.game.config) this.game.over = true;
+    this._resolveTurnEnd();
+  }
+
+  _resolveWelcome(val) {
+    if (this._welcomeTimer) { clearTimeout(this._welcomeTimer); this._welcomeTimer = null; }
+    if (this._welcomeResolve) { this._welcomeResolve(val); this._welcomeResolve = null; }
   }
 
   _send(obj) {
@@ -58,7 +77,11 @@ export class Net {
     this.role = role;
     await this.connect();
     this._send({ t: 'join', room, role });
-    return new Promise((resolve) => { this._welcomeResolve = resolve; });
+    return new Promise((resolve) => {
+      this._welcomeResolve = resolve;
+      // never hang on a blank screen if the relay drops silently before 'welcome'
+      this._welcomeTimer = setTimeout(() => this._resolveWelcome(null), 8000);
+    });
   }
 
   // ---------- messages ----------
@@ -77,7 +100,7 @@ export class Net {
 
     } else if (m.t === 'err') {
       this.ui.addChat('SYSTEM', '#ff5544', m.m, false);
-      if (this._welcomeResolve) this._welcomeResolve(null);
+      this._resolveWelcome(null);
 
     } else if (m.t === 'peer') {
       if (!this.isHost) return;
@@ -110,7 +133,7 @@ export class Net {
       if (this.onRoster) this.onRoster();
 
     } else if (m.t === 'msg') {
-      this._onData(m.from, m.d);
+      this._onData(m.from, m.d, m.host === true);
     }
   }
 
@@ -204,11 +227,22 @@ export class Net {
     return this.game.factions.findIndex((f) => f.controller === 'human');
   }
 
-  _onData(from, d) {
+  _onData(from, d, fromHost) {
+    if (!d || typeof d !== 'object' || typeof d.k !== 'string') return;
+    // Enforce the "host authoritative" model the relay can't: room-control
+    // messages are honoured only from the host, and action/advance events only
+    // from the host or an assigned player — a spectator can't hijack or desync.
+    if (d.k === 'welcome' || d.k === 'assign' || d.k === 'start') {
+      if (!fromHost) return;
+    } else if (d.k === 'act' || d.k === 'adv') {
+      const isPlayer = Object.values(this.assignments).includes(from);
+      if (!fromHost && !isPlayer) return;
+    }
+
     if (d.k === 'welcome') {
       this.assignments = d.assignments || {};
       if (d.you != null) this.myFaction = Number(d.you);
-      if (this._welcomeResolve) { this._welcomeResolve(d); this._welcomeResolve = null; }
+      this._resolveWelcome(d);
 
     } else if (d.k === 'assign') {
       this.assignments = d.map || {};

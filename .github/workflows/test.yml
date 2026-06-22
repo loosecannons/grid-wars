@@ -23,6 +23,8 @@ jobs:
       - run: npm test
         env:
           CI: '1'
+      # raw-socket integration test for the relay's host-authority hardening
+      - run: npm run test:relay
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:

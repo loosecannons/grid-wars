@@ -9,6 +9,7 @@
   "scripts": {
     "start": "node server.js",
     "test": "playwright test",
+    "test:relay": "node tests/relay.test.cjs",
     "electron": "electron .",
     "dist:win": "electron-builder --win portable --x64 --publish never",
     "dist:linux": "electron-builder --linux AppImage deb --x64 --publish never",

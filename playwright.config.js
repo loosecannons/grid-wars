@@ -10,6 +10,7 @@ const PORT = process.env.PORT || '8137';
 
 module.exports = defineConfig({
   testDir: './tests',
+  testMatch: '**/*.spec.js', // exclude the standalone node relay.test.cjs
   timeout: 60000,
   expect: { timeout: 15000 },
   fullyParallel: false,

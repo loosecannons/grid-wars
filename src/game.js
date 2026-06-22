@@ -154,6 +154,7 @@ export class Game {
           speed: u.speed || 1,
           coreId: u.coreId,
           conquest: u.conquest || null,
+          focusHits: u.focusHits || 0, // focus-fire bonus is mid-round state
           face, heading: u.heading != null ? u.heading : null,
         };
       }),
@@ -307,6 +308,7 @@ export class Game {
         u.speed = s.speed || 1;
         u.coreId = s.coreId != null ? s.coreId : null;
         if (s.conquest) u.conquest = s.conquest;
+        u.focusHits = s.focusHits || 0; // restore mid-round focus-fire bonus
         if (s.heading != null) u.heading = s.heading;
         // restore the saved facing (spawn faced the Grid centre) — the turret is
         // a child so its local angle, set above, rides along with the hull
@@ -1285,7 +1287,9 @@ export class Game {
   build(side, type, core = null) {
     const def = UNIT_TYPES[type];
     const f = this.factions[side];
-    if (!def || !def.cost || f.energy < def.cost) return null;
+    // test cost presence explicitly: a house-rule cost of 0 is valid (the RULES
+    // editor allows it) and must still build — `!def.cost` would reject it forever
+    if (!def || def.cost == null || f.energy < def.cost) return null;
     if (this.buildable && !this.buildable.includes(type)) return null; // map-restricted
     if (!core || !core.alive || core.side !== side) core = this.coreOf(side);
     if (!core) return null;
@@ -2962,14 +2966,32 @@ export class Game {
     })();
   }
 
+  // Free a dead/replaced unit mesh's GPU resources. Removing it from the scene
+  // does NOT release geometry/material/texture memory — that must be disposed
+  // explicitly or every kill leaks (~40 unique objects for a light cycle).
+  // Safe because unit meshes share no module-level geometries/materials.
+  _disposeMesh(root) {
+    root.traverse((o) => {
+      if (o.geometry) o.geometry.dispose();
+      const mats = Array.isArray(o.material) ? o.material : (o.material ? [o.material] : []);
+      for (const mat of mats) {
+        if (mat.map) mat.map.dispose(); // e.g. the health-bar CanvasTexture
+        mat.dispose();
+      }
+    });
+  }
+
   recolorUnit(u, f) {
     for (const m of u.mesh.userData.glowMats || []) {
       m.userData.baseColor = f.color;
     }
     this.setDim(u, this.isDone(u));
     if (u.wedgeMat) u.wedgeMat.color.setHex(f.color);
-    // rebuild the health bar in the new colour
+    // rebuild the health bar in the new colour — dispose the old sprite's
+    // material + CanvasTexture first or each conquest leaks them
     u.mesh.remove(u.bar.sprite);
+    if (u.bar.sprite.material.map) u.bar.sprite.material.map.dispose();
+    u.bar.sprite.material.dispose();
     u.bar = makeHealthBar(f.css, HEALTHBAR_Y[u.type]);
     u.mesh.add(u.bar.sprite);
     u.bar.update(Math.max(0, u.hp / u.maxHp));
@@ -3216,6 +3238,7 @@ export class Game {
       const scale = Math.min(2.4, Math.max(0.7, diag * 0.55));
       const derezDone = this.fx.derez(target.mesh, f.color);
       this.scene.remove(target.mesh);
+      this._disposeMesh(target.mesh); // derez built its own voxels; the hull is free to dispose
       this.fx.explosion(pos, f.color, scale);
       await derezDone;
       this.checkVictory();
@@ -3346,6 +3369,7 @@ export class Game {
         const diag = box.getSize(new THREE.Vector3()).length();
         this.fx.derez(u.mesh, f.color);
         this.scene.remove(u.mesh);
+        this._disposeMesh(u.mesh);
         this.fx.explosion(pos, f.color, Math.min(2.4, Math.max(0.7, diag * 0.55)));
         await this.fx.wait(0.22);
       }
@@ -4269,6 +4293,7 @@ export class Game {
     const scale = Math.min(2.4, Math.max(0.7, box.getSize(this._v1).length() * 0.55));
     const done = this.fx.derez(t.mesh, f.color);
     this.scene.remove(t.mesh);
+    this._disposeMesh(t.mesh);
     this.fx.explosion(pos, f.color, t.type === 'core' ? 2.2 : scale);
     await done;
   }

@@ -45,4 +45,32 @@ test.describe('custom maps API', () => {
     const res = await request.get('/api/maps/' + encodeURIComponent('../secret'));
     expect(res.status()).toBe(400);
   });
+
+  test('a malicious map sizeKey is HTML-escaped in the maps list (no stored XSS)', async ({ page, request }) => {
+    const payload = '<img src=x onerror=window.__pwned=1>';
+    const post = await request.post('/api/maps', {
+      data: {
+        name: 'PW XSS', sizeKey: payload, terrain: [],
+        placements: [{ side: 0, type: 'core', q: 0, r: 5 }, { side: 1, type: 'core', q: 0, r: -5 }],
+      },
+    });
+    const { id } = await post.json();
+    try {
+      await page.goto('/');
+      await page.click('#maps-btn');
+      await page.waitForFunction(
+        () => document.getElementById('maps-list').textContent.includes('PW XSS'),
+        null, { timeout: 15000 });
+      const r = await page.evaluate(() => ({
+        pwned: window.__pwned === 1,
+        escaped: document.getElementById('maps-list').innerHTML.includes('&lt;img'),
+        noRawImg: !document.querySelector('#maps-list img'),
+      }));
+      expect(r.pwned).toBe(false); // the onerror never fired
+      expect(r.escaped).toBe(true); // rendered as text, not markup
+      expect(r.noRawImg).toBe(true); // no injected element
+    } finally {
+      await request.delete('/api/maps/' + id);
+    }
+  });
 });
