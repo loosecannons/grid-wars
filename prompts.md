@@ -14,6 +14,7 @@ by an AI from these prompts alone; there was no hand-written code.
 |-------|-------|---------|
 | 1 — Initial creation | **Claude Fable 5** (`claude-fable-5`) | 19 |
 | 2 — Expansion & polish | **Claude Opus 4.8** (1M context, `claude-opus-4-8`) | 123 |
+| 3 — Distribution, hardening & depth | **Claude Opus 4.8** (1M context, `claude-opus-4-8`) | 35 |
 
 Tooling: [Claude Code](https://claude.com/claude-code). The prompts below are
 verbatim user messages in order; routine continuations, slash-commands, and
@@ -320,7 +321,79 @@ tool chatter have been removed. Light typos are the user's own.
 142. can you extract all the prompts and models used to generate this project into a sequential prompts.md file? Maybe create a extensive createPrompt.md file that could be used to recreate the whole project as is in a single structured prompt. Can you also add instructions and links to docker hub for easy installation to the readme.
    can you add an info screen, displaying the readme within the game.
 
+## Phase 3 — Distribution, hardening & depth (Claude Opus 4.8)
+
+143. can you also create a github release with the same version tag as docker.
+
+144. can we automate the github release to docker hub update?
+
+145. is there an official way to mark the repository as AI-generated? can you add appropriate labels.
+
+146. for the lobby, can you add an qrcode for the urls and try and resolve the actual ip-address of localhost.
+
+147. can you add iconify button to the unit card, so it can be permanently hidden but also be unhidden easily.
+
+148. another easter egg: when you beat the final Grid War mission, show a fake retro system crash — a Windows blue-screen in dark mode and an Amiga "Guru Meditation" red box at the top of the screen in light mode, dismissable with a click.
+
+149. on the starting screen 'custom maps' and every button to the left should be on an extra row.
+
+150. in the game the transmission/chat hide should hide the transmissions and the input fields completely and iconify to the top right corner.
+
+151. now for same major addition: the map editor. add a map editor, allowing for setting map features and unit and core placement. maps shoudl be stored in the backend and be selectable in grid wars. also add the ability to save maps in the game menu for automatically generated maps.
+
+152. when playing a map from the editor, the should be an extra button to return to the editor in the menu.
+
+153. another easter egg: when a lightcycle hits the outside of the map because of high velocity, a visual should appear as if a wall has been cracked. this crack becomes a portal. another cycle driving through it is dropped in the middle of the map — it survives only if the hex is a normal hex, and it damages any unit on that hex (even flying ones). if more than one portal exists, the destination is random: the middle, or another portal.
+
+154. change the visuals for the portal to be very subtile crack in a wall, hardly noticable and like a cracks in a real floor or wall.
+
+155. i don't think the cracks are visible.
+
+156. the portal need be 3d objects where you can see inside the crack, crisp not rounded, like in a stone wall.
+
+157. think of the outside of the map being surrounded by invisible walls. when the cycle hits, a crack appears, but the wall is still invisible, only the crack is visible. It should not affect the floor.
+
+158. still too softedged and should be wider.
+
+159. can you make it wireframe like edges of the hex.
+
+160. still a but too soft.
+
+161. push a release.
+
+162. can you a windows runtime version, packaged as an exe.
+
+163. is there a way to package the game for linux as well?
+
+164. what about mac?
+
+165. also add debian.
+
+166. add a small notifcation at the start screen if a new release is available on github.
+
+167. add regression tests for every feature, maybe using playwright or similar.
+
+168. are there any security issues to fix?
+
+169. make a release please.
+
+170. can you check for any issues in the game, from security to performance and give me a list of issues that might need fixing.
+
+171. a and b. _(in answer to: apply the quick-win fixes, and also the medium multiplayer-security cluster)_
+
+172. can you improve performance for example by Level of Details.
+
+173. in manic map size, when zooming in, LOD is not changed.
+
+174. make a realease.
+
+175. In simultanious mode, the walls are always straight, can you see if there is a bug?
+
+176. five changes at once: (1) move the save-replay option from the end of a game into the menu, so a save is always possible; (2) restrict camera movement so it can't look underneath the map; (3) add multiple AI levels, where level 1 is the current AI and levels 2–5 look that many turns ahead (up to 5); (4) make the AI level a selectable option when creating a game; (5) make it easier for a lightcycle to enter a broken-wall portal — e.g. click the tear to ride through, without needing full velocity.
+
+177. please update prompts.md and createPrompt.md to reflect all changes since they were created.
+
 ---
 
-_Total: 142 prompts. Generated from the Claude Code session
+_Total: 177 prompts. Generated from the Claude Code session
 transcripts for this project._
