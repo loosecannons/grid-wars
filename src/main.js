@@ -40,7 +40,9 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.target.set(0, 0, 1);
 controls.enableDamping = true;
 controls.dampingFactor = 0.07;
-controls.maxPolarAngle = 1.32;
+// keep the camera comfortably above the horizon so you can never tilt down to
+// graze across (and see under) the floating grid platform — ~24° above level
+controls.maxPolarAngle = 1.15;
 controls.minDistance = 6;
 controls.maxDistance = 42;
 controls.enablePan = true;
@@ -801,11 +803,27 @@ function saveReplay(rec) {
     ts: rec._savedTs,
     label: SIZES[rec.sizeKey].label + ' · '
       + rec.configs.map((c) => c.name).join(' v ') + ' · '
-      + (rec.winner ? rec.winner + ' wins' : 'draw'),
+      + (rec.over ? (rec.winner ? rec.winner + ' wins' : 'draw') : 'in progress'),
     rec,
   });
   all = all.slice(0, 12); // keep the latest dozen
   try { localStorage.setItem('gw-replays', JSON.stringify(all)); } catch (e) { /* full */ }
+}
+
+// Save a replay of the game SO FAR (the in-game menu button) — snapshots the
+// live recording into a fresh object so it can be saved at any point, and
+// repeatedly, without the end-of-game dedup swallowing later saves.
+function saveReplayNow() {
+  const rec = game.recording;
+  if (!rec || !rec.events.length) return false;
+  saveReplay({
+    sizeKey: rec.sizeKey, seed: rec.seed, configs: rec.configs,
+    mods: rec.mods || null, mission: rec.mission || null,
+    simultaneous: rec.simultaneous, perUnitInit: rec.perUnitInit, rules: rec.rules || null,
+    events: rec.events.slice(), markers: rec.markers.slice(),
+    over: !!rec.over, winner: rec.winner || null,
+  });
+  return true;
 }
 
 function loadReplays() {
@@ -1082,6 +1100,14 @@ document.getElementById('btn-save-replay').addEventListener('click', (e) => {
   if (!game.recording) return;
   saveReplay(game.recording);
   e.target.textContent = 'SAVED ✓';
+});
+// in-game menu: save a replay of the game so far, any time
+document.getElementById('btn-save-replay-game').addEventListener('click', (e) => {
+  const btn = e.currentTarget;
+  const ok = saveReplayNow();
+  const prev = btn.innerHTML;
+  btn.innerHTML = ok ? 'SAVED ✓' : 'NOTHING YET';
+  setTimeout(() => { btn.innerHTML = prev; }, 1600);
 });
 
 function resumeSession(id) {
