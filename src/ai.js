@@ -1,5 +1,25 @@
 import { key, parseKey, hexDistance, hexToWorld } from './hex.js';
 import { UNIT_TYPES } from './constants.js';
+import { lookaheadValue } from './ai-search.js';
+
+// Choose a unit's action from its candidate move+attack list. Level 1 takes the
+// best immediate score (the classic greedy commander); levels 2-5 re-rank the
+// top candidates by a bounded lookahead that weighs the opponent's best replies.
+function pickBest(game, unit, cands) {
+  if (!cands.length) return null;
+  const level = game.aiLevelOf(unit.side);
+  if (level <= 1) return cands.reduce((a, b) => (b.score > a.score ? b : a));
+  const top = [...cands].sort((a, b) => b.score - a.score).slice(0, level >= 4 ? 5 : 8);
+  let best = top[0], bestV = -Infinity;
+  for (const c of top) {
+    const { q, r } = parseKey(c.pos.k);
+    const v = lookaheadValue(game, unit.side,
+      { unitId: unit.id, q, r, targetId: c.target ? c.target.id : null }, level)
+      + c.score * 0.01; // tiny tie-break toward the immediately stronger move
+    if (v > bestV) { bestV = v; best = c; }
+  }
+  return best;
+}
 
 // The MCP commander, generalised to any faction:
 // 1. every unit evaluates each move+attack combination (kills, wounded targets,
@@ -82,7 +102,7 @@ export async function aiUnitAct(game, unit) {
       return 0;
     };
 
-    let best = null;
+    const cands = [];
     for (const pos of positions) {
       if (pos.cost > 0 && slideDeath(pos.k, pos.cost)) continue;
       const { q, r } = parseKey(pos.k);
@@ -104,7 +124,7 @@ export async function aiUnitAct(game, unit) {
         if (target.type === 'tank') score += 2;
         score += offense;                                   // shear / fence on the way
         score -= pos.cost * 0.15;                           // prefer not to overextend
-        if (!best || score > best.score) best = { pos, target, score };
+        cands.push({ pos, target, score });
       }
       // special: a cycle next to an enemy core can channel a conquest —
       // continuing one already in progress is nearly irresistible
@@ -115,9 +135,7 @@ export async function aiUnitAct(game, unit) {
           if (hexDistance({ q, r }, core) !== 1) continue;
           const continuing = core.conquest && core.conquest.byCycle === unit.id;
           let score = (continuing ? 75 : 38) - pos.cost * 0.15;
-          if (!best || score > best.score) {
-            best = { pos, target: core, score, special: 'conquer' };
-          }
+          cands.push({ pos, target: core, score, special: 'conquer' });
         }
       }
       // special: a tank beside an enemy cycle can ram it — lethal shoves
@@ -130,13 +148,12 @@ export async function aiUnitAct(game, unit) {
           const p = game.predictPush(unit, t, { q, r });
           const lethal = p.type === 'hole' || p.type === 'wall' || p.type === 'edge';
           let score = (lethal ? 48 : p.type === 'slam' ? 4 : 2) - pos.cost * 0.15;
-          if (!best || score > best.score) {
-            best = { pos, target: t, score, special: 'push' };
-          }
+          cands.push({ pos, target: t, score, special: 'push' });
         }
       }
     }
 
+    const best = pickBest(game, unit, cands);
     if (best) {
       if (best.pos.cost > 0) {
         await game.moveUnit(unit, getPath(best.pos.k), best.pos.cost);

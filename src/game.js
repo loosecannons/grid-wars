@@ -238,6 +238,9 @@ export class Game {
         controller: c.controller === 'ai' ? 'ai'
           : c.controller === 'neutral' ? 'neutral' : 'human',
         isAI: c.controller === 'ai',
+        // MCP skill: 1 = the classic greedy commander, 2-5 add progressively
+        // deeper bounded lookahead (it weighs the opponent's best replies)
+        aiLevel: Math.max(1, Math.min(5, c.aiLevel || 1)),
         // a NEUTRAL faction never takes a turn — it just holds an idle core (a
         // capture-the-flag objective) until a cycle conquers it
         neutral: c.controller === 'neutral',
@@ -688,6 +691,9 @@ export class Game {
   teamOf(side) { return this.factions[side].team; }
 
   isHostile(a, b) { return this.teamOf(a) !== this.teamOf(b); }
+
+  // MCP skill level for a faction (1 greedy .. 5 deepest lookahead)
+  aiLevelOf(side) { const f = this.factions[side]; return (f && f.aiLevel) || 1; }
 
   hostileUnits(side) {
     return this.units.filter((u) => u.alive && this.isHostile(u.side, side));

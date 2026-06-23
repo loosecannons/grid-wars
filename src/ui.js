@@ -344,7 +344,7 @@ export class UI {
       ];
     }
     rows = rows.slice(0, cfg.maxPlayers);
-    rows.forEach((r, i) => { if (!r.team) r.team = i + 1; });
+    rows.forEach((r, i) => { if (!r.team) r.team = i + 1; if (!r.aiLevel) r.aiLevel = 1; });
 
     const render = () => {
       rowsEl.innerHTML = '';
@@ -387,6 +387,20 @@ export class UI {
         });
         div.appendChild(ctl);
 
+        // MCP skill: only meaningful for AI seats. 1 = fast greedy, 2-5 look
+        // progressively further ahead.
+        if (row.controller === 'ai') {
+          const lvl = document.createElement('button');
+          lvl.className = 'small ctl ai';
+          lvl.textContent = 'LVL ' + (row.aiLevel || 1);
+          lvl.title = 'MCP skill — how many turns the AI looks ahead (1 fast … 5 deepest)';
+          lvl.addEventListener('click', () => {
+            row.aiLevel = ((row.aiLevel || 1) % 5) + 1;
+            render();
+          });
+          div.appendChild(lvl);
+        }
+
         // team: factions sharing a team number win together
         const team = document.createElement('button');
         team.className = 'small team';
@@ -428,6 +442,7 @@ export class UI {
         color: color % COLOR_PALETTE.length,
         controller: 'ai',
         team,
+        aiLevel: 1,
       });
       render();
     };
