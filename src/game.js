@@ -8,7 +8,7 @@ import {
 } from './constants.js';
 import {
   buildUnitMesh, buildCore, buildTile, buildTileField, buildHighlight, buildHighTile,
-  buildHoleTile, buildHealTile, buildFacingWedge, makeHealthBar,
+  buildHoleTile, buildHealTile, buildFacingWedge, makeHealthBar, buildUnitProxy,
 } from './models.js';
 import { aiTakeTurn, aiUnitAct, aiProduce } from './ai.js';
 
@@ -87,6 +87,7 @@ export class Game {
     this.healMats = [];             // pulsing heal-pad materials
     this.healStreams = [];          // rising heal-pad particle streams
     this.pickMeshes = [];           // raycast targets
+    this._lodFar = false;           // LOD: true when units render as cheap blips
 
     this.simultaneous = false;      // WeGo mode: plan, then resolve all at once
     this.planning = null;           // faction id currently planning (sim mode)
@@ -532,12 +533,40 @@ export class Game {
 
       const hl = buildHighlight();
       hl.position.set(x, TERRAIN_Y[cell.terrain] + 0.04, z);
+      // a highlight never moves (only its visibility/colour changes) — compute
+      // its world matrix once and keep it out of the per-frame matrix walk
+      hl.matrixAutoUpdate = false; hl.updateMatrix(); hl.matrixWorld.copy(hl.matrix);
+      hl.matrixWorldAutoUpdate = false;
       this.scene.add(hl);
       this.highlights.set(ck, hl);
     }
     this.tileField = buildTileField(flatPositions);
+    this.tileField.matrixAutoUpdate = false; this.tileField.updateMatrix();
+    this.tileField.matrixWorld.copy(this.tileField.matrix);
+    this.tileField.matrixWorldAutoUpdate = false; // spans the whole grid, never moves
     this.scene.add(this.tileField);
     this.pickMeshes.push(this.tileField);
+  }
+
+  // LOD: swap every unit between its full model and a single bright blip. Driven
+  // from the render loop when the camera crosses the detail threshold; a no-op
+  // when the level is unchanged, so it's cheap to call every frame.
+  setDetailLevel(far) {
+    far = !!far;
+    if (far === this._lodFar) return;
+    this._lodFar = far;
+    for (const u of this.units) {
+      if (!u.alive) continue;
+      const lod = u.mesh.userData.lod;
+      if (!lod) continue;
+      for (const p of lod.parts) {
+        p.visible = !far;
+        // hidden detail needn't be walked while far (the unit still re-forces it
+        // on the frames it actually moves, so it snaps back correctly near)
+        p.matrixWorldAutoUpdate = !far;
+      }
+      lod.proxy.visible = far;
+    }
   }
 
   // Export the current board (terrain + live unit placements + faction setup) as
@@ -566,6 +595,7 @@ export class Game {
     const mesh = type === 'core'
       ? buildCore(f.color, f.isAI)
       : buildUnitMesh(type, f.color);
+    const lodParts = mesh.children.slice(); // the full model — hidden in LOD-far mode
 
     const { x, z } = hexToWorld(q, r);
     const baseY = def.fly ? FLY_HEIGHT : 0;
@@ -612,6 +642,13 @@ export class Game {
       mesh, bar, baseY, readyRing, wedgeMat,
       alive: true,
     };
+    // LOD: a cheap faction blip swapped in for the full model when zoomed out.
+    // Added before the unitId traverse so it stays a valid pick target far out.
+    const lodProxy = buildUnitProxy(type, f.color);
+    lodProxy.visible = this._lodFar;
+    mesh.add(lodProxy);
+    if (this._lodFar) for (const p of lodParts) p.visible = false;
+    mesh.userData.lod = { parts: lodParts, proxy: lodProxy };
     mesh.traverse((o) => { o.userData.unitId = unit.id; });
     this.units.push(unit);
     this.pickMeshes.push(mesh);

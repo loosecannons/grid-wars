@@ -607,6 +607,19 @@ export function buildHighlight() {
   return m;
 }
 
+// Level-of-detail stand-in: a single bright faction-coloured "blip" swapped in
+// for a unit's full ~40-mesh model when the camera is far enough that the
+// detail would be sub-pixel. One draw call per unit instead of dozens — the
+// big win on large maps zoomed out. The geometry is built PER UNIT (never
+// shared) so game.js's on-death dispose can free it without touching others.
+export function buildUnitProxy(type, color) {
+  const geo = new THREE.OctahedronGeometry(type === 'core' ? 0.5 : 0.34);
+  geo.scale(1, type === 'core' ? 1.6 : 1.35, 1); // a slightly tall diamond reads as a unit
+  const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color }));
+  m.position.y = type === 'core' ? 0.6 : 0.34;
+  return m;
+}
+
 // Healing pad — units standing here repair at the start of their turn.
 export function buildHealTile() {
   const g = buildTile();

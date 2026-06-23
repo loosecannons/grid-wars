@@ -83,8 +83,12 @@ for (let i = 0; i < 3; i++) {
 const composer = new EffectComposer(renderer);
 const renderPass = new RenderPass(scene, camera);
 composer.addPass(renderPass);
+// the bloom pyramid (a 5-level blur) runs at HALF the drawing-buffer resolution
+// — the soft glow tolerates it and it roughly quarters the bloom's GPU cost,
+// heaviest on hi-DPI / 4K. resizeRender() keeps it at BLOOM_SCALE on every resize.
+const BLOOM_SCALE = 0.5;
 const bloom = new UnrealBloomPass(
-  new THREE.Vector2(window.innerWidth, window.innerHeight),
+  new THREE.Vector2(window.innerWidth * BLOOM_SCALE, window.innerHeight * BLOOM_SCALE),
   0.85, 0.55, 0.25
 );
 composer.addPass(bloom);
@@ -232,6 +236,8 @@ function resizeRender() {
   // FXAA samples in 1/pixel units of the actual drawing buffer
   const db = renderer.getDrawingBufferSize(new THREE.Vector2());
   fxaaPass.material.uniforms.resolution.value.set(1 / db.x, 1 / db.y);
+  // composer.setSize() reset bloom to full res — drop it back to half
+  bloom.setSize(Math.max(1, Math.round(db.x * BLOOM_SCALE)), Math.max(1, Math.round(db.y * BLOOM_SCALE)));
 }
 
 // 16-bit mode paints the base hex tiles light grey (a flat "board" colour that
@@ -1497,6 +1503,25 @@ window.addEventListener('resize', () => { resizeRender(); });
 
 const clock = new THREE.Clock();
 
+// LOD: estimate a unit's on-screen height (px) for the live camera and tell the
+// game to swap to cheap blips once the full models would be sub-pixel detail.
+// Self-tuning across map sizes — small maps never zoom far enough to trigger it,
+// so normal play keeps full detail; only big maps zoomed right out switch.
+const LOD_MIN_PX = 13;
+function updateDetail() {
+  if (!game.config) return;
+  const cam = activeCamera;
+  const H = renderer.domElement.clientHeight || window.innerHeight;
+  let px;
+  if (cam.isPerspectiveCamera) {
+    const dist = cam.position.distanceTo(controls.target) || 1;
+    px = H / (2 * Math.tan(cam.fov * Math.PI / 360) * dist); // px per world unit at the target
+  } else {
+    px = (H * cam.zoom) / (cam.top - cam.bottom); // ortho (classic view)
+  }
+  game.setDetailLevel(px < LOD_MIN_PX);
+}
+
 function loop() {
   requestAnimationFrame(loop);
   const dt = Math.min(clock.getDelta(), 0.05);
@@ -1505,6 +1530,7 @@ function loop() {
   if (demo.active) updateDemo(t, dt);
   else if (replay.active) updateReplayCamera(t, dt);
   else if (!flyingIn) controls.update(); // OrbitControls drives both modern & classic
+  updateDetail();
   fx.update(dt);
   game.updateIdle(t);
   ui.updatePreview(dt);
