@@ -4246,15 +4246,53 @@ export class Game {
 
   async _simMove(unit, path) {
     if (!path.length) return;
-    const isCycle = unit.type === 'cycle';
-    const isFly = UNIT_TYPES[unit.type].fly;
     const f = this.factionOf(unit);
-    let trail = null;
-    if (isCycle) {
-      trail = { side: unit.side, owner: unit.id, cells: new Set(), path: [], walls: [] };
+
+    // Cycles lay a single smooth CatmullRom wall through the WHOLE path and drive
+    // along it — exactly like sequential _driveCycle — instead of a string of
+    // straight per-step segments (which is why sim-mode walls used to be straight).
+    if (unit.type === 'cycle') {
+      const trail = { side: unit.side, owner: unit.id, cells: new Set(), path: [], walls: [] };
       this.trails.push(trail);
+      const fw = unit.mesh.getWorldDirection(new THREE.Vector3());
+      fw.y = 0; fw.normalize();
+      const startP = unit.mesh.position.clone().setY(0);
+      const pts = [startP.clone().addScaledVector(fw, -0.9), startP]; // phantom lead-in for a natural first corner
+      for (const s of path) { const { x, z } = hexToWorld(s.q, s.r); pts.push(new THREE.Vector3(x, 0, z)); }
+      const curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.55);
+      const spans = pts.length - 1;
+      const t0 = 1 / spans; // skip the phantom lead-in span
+      const tAt = (u) => t0 + u * (1 - t0);
+      const wave = this._wallWave(unit);
+      const ribbon = this.fx.trailRibbon(curve, f.color, pts.length * 10, t0, wave);
+      ribbon._build = { type: 'curve', pts: pts.map((p) => [r3(p.x), r3(p.z)]),
+        samples: pts.length * 10, tStart: t0, wave, reveal: 0 };
+      trail.walls.push(ribbon);
+      const segs = path.length;
+      const look = new THREE.Vector3();
+      for (let i = 0; i < segs; i++) {
+        const k0 = i / segs, k1 = (i + 1) / segs;
+        await this.fx.tween(0.12, (k) => {
+          const u = k0 + (k1 - k0) * k;
+          curve.getPoint(tAt(u), unit.mesh.position);
+          curve.getTangent(tAt(u), look).add(unit.mesh.position);
+          unit.mesh.lookAt(look.x, unit.mesh.position.y, look.z);
+          ribbon.reveal(u - 0.7 / segs);
+          if (unit.mesh.userData.wheels) {
+            for (const w of unit.mesh.userData.wheels) w.rotation.x += 0.5;
+          }
+        });
+        trail.cells.add(key(unit.q, unit.r)); // the cell just vacated
+        trail.path.push(key(unit.q, unit.r));
+        unit.q = path[i].q; unit.r = path[i].r;
+      }
+      ribbon.reveal(1);
+      ribbon._build.reveal = 1;
+      return;
     }
-    let prev = unit.mesh.position.clone().setY(0);
+
+    // Non-cycles: straight per-step hops (tanks breach walls along the way).
+    const isFly = UNIT_TYPES[unit.type].fly;
     for (const step of path) {
       const { x, z } = hexToWorld(step.q, step.r);
       const cell = this.cells.get(key(step.q, step.r));
@@ -4263,21 +4301,13 @@ export class Game {
       const hop = isFly ? (isRough(cell.terrain) ? 0.5 : 0.12) : 0;
       unit.mesh.lookAt(dest.x, unit.mesh.position.y, dest.z);
       const from = unit.mesh.position.clone();
-      await this.fx.tween(isCycle ? 0.12 : 0.16, (k) => {
+      await this.fx.tween(0.16, (k) => {
         unit.mesh.position.lerpVectors(from, dest, k);
         unit.mesh.position.y += Math.sin(k * Math.PI) * hop;
         if (unit.mesh.userData.wheels) {
           for (const w of unit.mesh.userData.wheels) w.rotation.x += 0.5;
         }
       });
-      if (trail) {
-        trail.cells.add(key(unit.q, unit.r));
-        trail.path.push(key(unit.q, unit.r));
-        const wall = this.fx.trailRibbon(
-          [prev.clone(), dest.clone().setY(0)], f.color, 8, 0, this._wallWave(unit));
-        wall.reveal(1); trail.walls.push(wall);
-        prev = dest.clone().setY(0);
-      }
       unit.q = step.q; unit.r = step.r;
       if (unit.type === 'tank') this.breachWalls(step.q, step.r);
     }
