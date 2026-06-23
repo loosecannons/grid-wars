@@ -548,25 +548,39 @@ export class Game {
     this.pickMeshes.push(this.tileField);
   }
 
-  // LOD: swap every unit between its full model and a single bright blip. Driven
-  // from the render loop when the camera crosses the detail threshold; a no-op
-  // when the level is unchanged, so it's cheap to call every frame.
-  setDetailLevel(far) {
-    far = !!far;
-    if (far === this._lodFar) return;
-    this._lodFar = far;
+  // LOD: swap ONE unit between its full model and a single bright blip (a no-op
+  // if it's already at that level, so it's cheap to call every frame).
+  _applyUnitLOD(u, far) {
+    const lod = u.mesh.userData.lod;
+    if (!lod || lod.far === far) return;
+    lod.far = far;
+    for (const p of lod.parts) {
+      p.visible = !far;
+      // hidden detail needn't be walked while far — the unit re-forces it on the
+      // frames it actually moves, so it snaps back correctly when it returns
+      p.matrixWorldAutoUpdate = !far;
+    }
+    lod.proxy.visible = far;
+  }
+
+  // Per-unit LOD by TRUE distance to the camera: units near the viewer keep full
+  // detail while distant ones drop to blips. Keyed off each unit's own distance
+  // (not the orbit target), so zooming or panning to any cluster on a huge map
+  // details exactly what you move close to. `nearDist` = the distance at which a
+  // unit is the threshold pixel-height on screen.
+  updateLOD(camPos, nearDist) {
     for (const u of this.units) {
       if (!u.alive) continue;
-      const lod = u.mesh.userData.lod;
-      if (!lod) continue;
-      for (const p of lod.parts) {
-        p.visible = !far;
-        // hidden detail needn't be walked while far (the unit still re-forces it
-        // on the frames it actually moves, so it snaps back correctly near)
-        p.matrixWorldAutoUpdate = !far;
-      }
-      lod.proxy.visible = far;
+      this._applyUnitLOD(u, camPos.distanceTo(u.mesh.position) > nearDist);
     }
+  }
+
+  // Force a single detail level on every unit — the classic ortho view (one
+  // global zoom) and the spawn-time default. Keeps _lodFar in step for newborns.
+  setDetailLevel(far) {
+    far = !!far;
+    this._lodFar = far;
+    for (const u of this.units) if (u.alive) this._applyUnitLOD(u, far);
   }
 
   // Export the current board (terrain + live unit placements + faction setup) as
@@ -647,8 +661,8 @@ export class Game {
     const lodProxy = buildUnitProxy(type, f.color);
     lodProxy.visible = this._lodFar;
     mesh.add(lodProxy);
-    if (this._lodFar) for (const p of lodParts) p.visible = false;
-    mesh.userData.lod = { parts: lodParts, proxy: lodProxy };
+    if (this._lodFar) for (const p of lodParts) { p.visible = false; p.matrixWorldAutoUpdate = false; }
+    mesh.userData.lod = { parts: lodParts, proxy: lodProxy, far: this._lodFar };
     mesh.traverse((o) => { o.userData.unitId = unit.id; });
     this.units.push(unit);
     this.pickMeshes.push(mesh);

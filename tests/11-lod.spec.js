@@ -32,6 +32,29 @@ test.describe('level of detail', () => {
     expect(r.near.proxyHidden).toBe(true);
   });
 
+  test('updateLOD is per-unit: near the camera details, distant stays a blip', async ({ page }) => {
+    await bootSkirmish(page);
+    const r = await page.evaluate(() => {
+      const g = window.__game;
+      const alive = g.units.filter((u) => u.alive);
+      const A = alive.find((u) => u.type !== 'core');
+      const camPos = A.mesh.position; // pretend the camera sits right on unit A
+      const nearDist = 4; // small radius so the split is meaningful on a small map
+      g.updateLOD(camPos, nearDist);
+      const d = (u) => camPos.distanceTo(u.mesh.position);
+      return {
+        aDetailed: A.mesh.userData.lod.far === false,
+        nearOk: alive.filter((u) => d(u) <= nearDist).every((u) => u.mesh.userData.lod.far === false),
+        farOk: alive.filter((u) => d(u) > nearDist).every((u) => u.mesh.userData.lod.far === true),
+        farCount: alive.filter((u) => d(u) > nearDist).length,
+      };
+    });
+    expect(r.aDetailed).toBe(true);
+    expect(r.nearOk).toBe(true);
+    expect(r.farOk).toBe(true);
+    expect(r.farCount).toBeGreaterThan(0); // some units ARE distant → a real per-unit split
+  });
+
   test('a unit built while zoomed out spawns straight into blip mode', async ({ page }) => {
     await bootSkirmish(page);
     const r = await page.evaluate(() => {

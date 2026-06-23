@@ -1512,14 +1512,16 @@ function updateDetail() {
   if (!game.config) return;
   const cam = activeCamera;
   const H = renderer.domElement.clientHeight || window.innerHeight;
-  let px;
   if (cam.isPerspectiveCamera) {
-    const dist = cam.position.distanceTo(controls.target) || 1;
-    px = H / (2 * Math.tan(cam.fov * Math.PI / 360) * dist); // px per world unit at the target
+    // px height of a 1-unit object at distance 1 → the distance at which it hits
+    // the threshold; units closer than that keep full detail, farther ones blip
+    const k = H / (2 * Math.tan(cam.fov * Math.PI / 360));
+    game.updateLOD(cam.position, k / LOD_MIN_PX);
   } else {
-    px = (H * cam.zoom) / (cam.top - cam.bottom); // ortho (classic view)
+    // ortho (classic view) has one global zoom, so a single level for all units
+    const px = (H * cam.zoom) / (cam.top - cam.bottom);
+    game.setDetailLevel(px < LOD_MIN_PX);
   }
-  game.setDetailLevel(px < LOD_MIN_PX);
 }
 
 function loop() {
