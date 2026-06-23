@@ -1493,6 +1493,7 @@ function pick(ev) {
     }
     let o = h.object;
     while (o) {
+      if (o.userData.portalIdx != null) return { portal: o.userData.portalIdx, cellKey: o.userData.cellKey };
       if (o.userData.unitId != null) return { unitId: o.userData.unitId };
       if (o.userData.cellKey) return { cellKey: o.userData.cellKey };
       o = o.parent;

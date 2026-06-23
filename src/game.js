@@ -830,6 +830,9 @@ export class Game {
       case 'conq':
         if (u && u.alive) await this.conquestAttack(u);
         return;
+      case 'portal':
+        if (u && u.alive) await this._warpThroughPortal(u, ev.p, ev.dest);
+        return;
       case 'build':
         this.build(ev.side, ev.type, ev.core != null ? this.unitById(ev.core) : null);
         return;
@@ -1514,6 +1517,16 @@ export class Game {
         }
       }
       return;
+    }
+
+    if (hit && hit.portal != null) {
+      const u = this.selected;
+      const portal = this.portals[hit.portal];
+      if (portal && u && u.alive && u.type === 'cycle' && !u.attacked) {
+        this.enterPortalMove(u, hit.portal, touch);
+        return;
+      }
+      // not a cycle ready to ride — fall through and treat it as the edge cell
     }
 
     if (hit && hit.cellKey) {
@@ -2566,6 +2579,49 @@ export class Game {
   // included) or, if several portals exist, possibly out of another one.
   _portalAt(q, r) { return this.portals.find((p) => p.q === q && p.r === r); }
 
+  // Player clicked a portal tear with a cycle selected: ride it through (drive to
+  // the tear's edge cell first if needed) — no overdrive slam required. Emits a
+  // deterministic event so networked clients / replays warp in lockstep.
+  async enterPortalMove(unit, portalIdx, touch) {
+    const portal = this.portals[portalIdx];
+    if (!portal) return;
+    const edgeKey = key(portal.edgeQ, portal.edgeR);
+    const onEdge = unit.q === portal.edgeQ && unit.r === portal.edgeR;
+    if (!onEdge && !(this.destsMap && this.destsMap.has(edgeKey))) {
+      this.ui.showBanner('TEAR OUT OF REACH', this.factions[unit.side].css, 1200);
+      this.audio.uiDeny();
+      return;
+    }
+    if (this._armTouch(touch, 'portal:' + portalIdx, () => {
+      this.ui.showBanner('TAP AGAIN TO RIDE THE TEAR', this.factions[unit.side].css, 1300);
+    })) return;
+    this.emitNet({ a: 'portal', u: unit.id, p: portalIdx, dest: edgeKey });
+    this.busy = true;
+    this._undoStack = []; // a warp can't be taken back
+    this._refreshUndoUI();
+    this.clearHighlights();
+    await this._warpThroughPortal(unit, portalIdx, edgeKey);
+    this.busy = false;
+    if (this.over) return;
+    if (unit.alive) { if (this.isDone(unit)) this.setDim(unit, true); this.select(unit); }
+    else this.select(null);
+    this.maybeAutoEnd();
+  }
+
+  // Core warp logic shared by the player path and the networked/replay path:
+  // drive to the tear's edge cell (if not already there), then ride through.
+  async _warpThroughPortal(unit, portalIdx, edgeKey) {
+    const portal = this.portals[portalIdx];
+    if (!portal) return;
+    const onEdge = unit.q === portal.edgeQ && unit.r === portal.edgeR;
+    if (!onEdge) {
+      const { dests, getPath } = this.validDestinations(unit);
+      if (dests.has(edgeKey)) await this.moveUnit(unit, getPath(edgeKey), dests.get(edgeKey).cost);
+    }
+    if (unit.alive) await this._enterPortal(unit, portal);
+    if (unit.alive) { unit.movesLeft = 0; unit.attacked = true; } // the warp ends its turn
+  }
+
   async _hitBoundary(unit, off, edge) {
     const existing = off && this._portalAt(off.q, off.r);
     if (existing) { await this._enterPortal(unit, existing); return; }
@@ -2631,7 +2687,20 @@ export class Game {
     const mat = new THREE.MeshBasicMaterial({ color: 0x176f86, side: THREE.DoubleSide }); // hex-edge cyan
     const crack = new THREE.Mesh(geo, mat);   // vertices are already world-space
     this.scene.add(crack);
-    this.portals.push({ q: offQ, r: offR, edgeQ, edgeR, mesh: crack, center: B.clone() });
+    // an easy, invisible click target over the edge cell so a selected cycle can
+    // ride into the tear by clicking it — no need to slam the boundary at full
+    // speed first. Sits just above the floor so it wins the raycast over the tile.
+    const padIdx = this.portals.length; // the index this portal gets on push below
+    const pad = new THREE.Mesh(
+      new THREE.CircleGeometry(0.82, 6),
+      new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }));
+    pad.rotation.x = -Math.PI / 2;
+    pad.position.set(e.x, 0.12, e.z);
+    pad.userData.portalIdx = padIdx;
+    pad.userData.cellKey = key(edgeQ, edgeR);
+    this.scene.add(pad);
+    this.pickMeshes.push(pad);
+    this.portals.push({ q: offQ, r: offR, edgeQ, edgeR, mesh: crack, pad, center: B.clone() });
 
     // the impact is quiet: a few cyan sparks off the wall, a soft knock
     this.fx.burst({ pos: B.clone(), count: 10, color: 0x39c6e6,
