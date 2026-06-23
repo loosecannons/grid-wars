@@ -211,7 +211,9 @@ Build your own grids and play them. From the start screen:
 
 You can also **save a procedurally-generated grid**: in any running game, open
 **☰ MENU → SAVE MAP** to store the current terrain *and* unit layout as a custom
-map you can replay or edit later.
+map you can replay or edit later. The same menu has **🎞 SAVE REPLAY** to bank a
+replay of the game *so far* at any point (watch it later from **REPLAYS** on the
+start screen) — not only on the game-over screen.
 
 Maps are stored server-side as JSON (so this needs `server.js`, not a pure static
 host). The store lives in `maps/` by default — set `MAPS_DIR` (e.g. a Docker
@@ -245,7 +247,11 @@ end-of-game **replay** screen you can **restart the same map as a fresh game**.
 **Hotseat multiplayer**: after picking a grid size, set up 2–6 combatants —
 each with a name (your login), a colour (the colour *is* the side), a
 controller: **PLAYER** (human, plays with the full interface) or **MCP**
-(computer), and a **team** (T1–T6). Combatants sharing a team are allies:
+(computer). Each MCP seat also has a **LVL** button setting its skill **1–5**:
+level 1 is the fast greedy commander, and 2–5 add progressively deeper *bounded
+lookahead* — the MCP weighs the opponent's best replies a few moves out (deeper,
+and a little slower to think, at higher levels). Combatants also pick a **team**
+(T1–T6); those sharing a team are allies:
 they can't hit each other, their walls don't kill each other, and they
 **win together** once every rival team's cores have fallen. Any mix works —
 2v2, humans vs MCP alliances, free-for-all, or *all* MCPs to sit back and
